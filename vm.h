@@ -19,6 +19,7 @@ typedef struct VM {
   Value *sp;
 } VM;
 
+VM new_vm();
 void init_vm(VM* vm, Code* code);
 IResult run(VM* vm);
 

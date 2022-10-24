@@ -45,6 +45,11 @@ static IResult runtime_error(char* fmt, ...) {
   return RESULT_RUNTIME_ERROR;
 }
 
+VM new_vm() {
+  VM vm = {.code = NULL, .ip = NULL, .sp = NULL};
+  return vm;
+}
+
 void init_vm(VM* vm, Code* code) {
   vm->code = code;
   vm->ip = vm->code->bytes;

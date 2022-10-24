@@ -5,7 +5,7 @@ int plain_instruction(char* inst, int offset) {
   return ++offset;
 }
 
-int constant_instruction(char *inst, Code *code, int offset) {
+int constant_instruction(char* inst, Code* code, int offset) {
   // inst, operand, (value).
   int operand = code->bytes[++offset];
   printf("%-16s\t%3d    ", inst, operand);

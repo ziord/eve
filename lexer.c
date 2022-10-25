@@ -25,8 +25,12 @@ Token error_token(Lexer* lexer, char* msg) {
   return tok;
 }
 
-bool at_end(Lexer* lexer) {
+inline static bool at_end(Lexer* lexer) {
   return (*lexer->current == '\0');
+}
+
+inline static bool is_alpha(char ch) {
+  return ch == '_' || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 }
 
 char peek(Lexer* lexer, int next) {
@@ -57,6 +61,16 @@ inline static bool check(Lexer* lexer, char ch) {
     return true;
   }
   return false;
+}
+
+static TokenTy
+expect(Lexer* lexer, char* rem, int start, int rest, TokenTy ty) {
+  if (lexer->current - lexer->start == start + rest) {
+    if (memcmp(lexer->start + start, rem, rest) == 0) {
+      return ty;
+    }
+  }
+  return TK_IDENT;
 }
 
 void skip_whitespace(Lexer* lexer) {
@@ -102,6 +116,39 @@ Token lex_num(Lexer* lexer, char start) {
   return new_token(lexer, TK_NUM);
 }
 
+TokenTy keyword_type(Lexer* lexer, char ch) {
+  // keywords:
+  // true, false, None, struct, while,
+  // return, if, else, fn, let, is, show
+  switch (ch) {
+    case 't':
+      return expect(lexer, "rue", 1, 3, TK_TRUE);
+    case 'f':
+      switch (*(lexer->start + 1)) {
+        case 'a':
+          return expect(lexer, "lse", 2, 3, TK_FALSE);
+      }
+    case 'N':
+      return expect(lexer, "one", 1, 3, TK_NONE);
+    case 's':
+    case 'w':
+    case 'r':
+    case 'i':
+    case 'e':
+    case 'l':
+    default:
+      break;
+  }
+  return TK_IDENT;
+}
+
+Token lex_ident(Lexer* lexer, char ch) {
+  while (is_alpha(PEEK(lexer))) {
+    advance(lexer);
+  }
+  return new_token(lexer, keyword_type(lexer, ch));
+}
+
 Token get_token(Lexer* lexer) {
   skip_whitespace(lexer);
   lexer->start = lexer->current;
@@ -111,6 +158,8 @@ Token get_token(Lexer* lexer) {
   char ch = get_char(lexer);
   if (isdigit(ch)) {
     return lex_num(lexer, ch);
+  } else if (is_alpha(ch)) {
+    return lex_ident(lexer, ch);
   }
   switch (ch) {
     case '+':

@@ -26,6 +26,19 @@ void c_num(Compiler* compiler, AstNode* node) {
   emit_value(compiler, $LOAD_CONST, NUMBER_VAL(num->value), num->line);
 }
 
+void c_unit(Compiler* compiler, AstNode* node) {
+  UnitNode* unit = CAST(UnitNode*, node);
+  if (unit->is_bool) {
+    emit_value(
+        compiler,
+        $LOAD_CONST,
+        unit->is_true_bool ? TRUE_VAL : FALSE_VAL,
+        unit->line);
+  } else if (unit->is_none) {
+    emit_value(compiler, $LOAD_CONST, NONE_VAL, unit->line);
+  }
+}
+
 void c_unary(Compiler* compiler, AstNode* node) {
   UnaryNode* unary = CAST(UnaryNode*, node);
   c_(compiler, unary->node);
@@ -56,6 +69,9 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_UNARY:
       c_unary(compiler, node);
+      break;
+    case AST_UNIT:
+      c_unit(compiler, node);
       break;
     default:
       UNREACHABLE("compile - unknown ast node");

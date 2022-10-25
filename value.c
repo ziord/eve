@@ -35,9 +35,13 @@ void print_value(Value val) {
     printf("%s", AS_BOOL(val) ? "true" : "false");
   } else if (IS_NUMBER(val)) {
     printf("%g", AS_NUMBER(val));
+  } else if (IS_NONE(val)) {
+    printf("None");
   }
 }
 
 bool is_falsey_value(Value v) {
-  return (IS_NUMBER(v) && AS_NUMBER(v) || IS_BOOL(v) && !AS_BOOL(v));
+  return (
+      IS_NUMBER(v) && !AS_NUMBER(v) || (IS_BOOL(v) && !AS_BOOL(v))
+      || IS_NONE(v));
 }

@@ -127,7 +127,7 @@ IResult run(VM* vm) {
       }
       case $NOT: {
         Value v = pop_stack(vm);
-        push_stack(vm, BOOL_VAL(!is_falsey_value(v)));
+        push_stack(vm, BOOL_VAL(is_falsey_value(v)));
         break;
       }
       case $NEGATE: {

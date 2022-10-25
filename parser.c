@@ -23,6 +23,7 @@ typedef struct {
 static AstNode* _parse(Parser* parser, BindingPower bp);
 static AstNode* parse_num(Parser* parser);
 static AstNode* parse_unary(Parser* parser);
+static AstNode* parse_literal(Parser* parser);
 static AstNode* parse_binary(Parser* parser, AstNode* left);
 
 // clang-format off
@@ -36,6 +37,9 @@ ParseTable p_table[] = {
   [TK_EXC_MARK] = {.bp = BP_UNARY, .prefix = parse_unary, .infix = NULL},
   [TK_TILDE] = {.bp = BP_UNARY, .prefix = parse_unary, .infix = NULL},
   [TK_F_SLASH] = {.bp = BP_FACTOR, .prefix = NULL, .infix = parse_binary},
+  [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
+  [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
+  [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_EOF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ERROR] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
 };
@@ -109,6 +113,34 @@ static AstNode* parse_num(Parser* parser) {
   }
   ASSERT(tok.value + tok.length == endptr, "failed to convert number");
   AstNode* node = new_num(&parser->store, val, line);
+  return node;
+}
+
+static AstNode* parse_literal(Parser* parser) {
+  int false_val = 0, true_val = 0, none_val = 0;
+  int line = parser->current_tk.line;
+  switch (parser->current_tk.ty) {
+    case TK_FALSE:
+      false_val = 1;
+      break;
+    case TK_TRUE:
+      true_val = 1;
+      break;
+    case TK_NONE:
+      none_val = 1;
+      break;
+    default:
+      UNREACHABLE("parse-literal");
+  }
+  advance(parser);
+  AstNode* node = new_node(&parser->store);
+  node->unit = (UnitNode) {
+      .type = AST_UNIT,
+      .line = line,
+      .is_bool = false_val || true_val,
+      .is_none = none_val,
+      .is_false_bool = false_val,
+      .is_true_bool = true_val};
   return node;
 }
 

@@ -31,6 +31,8 @@ typedef uint64_t Value;
 #define AS_BOOL(b) ((b) == TRUE_VAL)
 #define IS_BOOL(b) (((b) | 1) == TRUE_VAL)
 
+#define IS_NONE(v) ((v) == NONE_VAL)
+
 #define OBJ_VAL(obj) ((Value)((uint64_t)(uintptr_t)(obj) | TAG_OBJ))
 #define AS_OBJ(val) ((Obj*)(uintptr_t)((val) & ~(TAG_OBJ)))
 #define IS_OBJ(val) (((val) & (TAG_OBJ)) == (TAG_OBJ))

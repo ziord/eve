@@ -17,7 +17,7 @@ typedef enum {
 
 typedef enum {
   AST_NUM,
-  AST_STR,
+  AST_UNIT,
   AST_UNARY,
   AST_BINARY,
 } AstTy;
@@ -46,16 +46,27 @@ typedef struct {
 } UnaryNode;
 
 typedef struct {
-  int length;
-  int capacity;
-  AstNode** nodes;
-} NodeStore;
+  // bool, None
+  AstTy type;
+  bool is_bool;
+  bool is_none;
+  bool is_true_bool;
+  bool is_false_bool;
+  int line;
+} UnitNode;
 
 union AstNode {
   NumberNode num;
   BinaryNode binary;
   UnaryNode unary;
+  UnitNode unit;
 };
+
+typedef struct {
+  int length;
+  int capacity;
+  AstNode** nodes;
+} NodeStore;
 
 void init_store(NodeStore* store);
 void free_store(NodeStore* store);

@@ -1,6 +1,7 @@
 #ifndef EVE_LEXER_H
 #define EVE_LEXER_H
 #include <ctype.h>
+#include <string.h>
 
 #include "common.h"
 
@@ -15,6 +16,10 @@ typedef enum {
   TK_TILDE,         // ~
   TK_F_SLASH,       // /
   TK_PERCENT,       // %
+  TK_FALSE,         // false
+  TK_TRUE,          // true
+  TK_NONE,          // None
+  TK_IDENT,         // identifier
   TK_EOF,           // EOF
   TK_ERROR,         // <error>
 } TokenTy;

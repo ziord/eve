@@ -10,8 +10,7 @@
       __LINE__, \
       (_msg))
 #define UNREACHABLE(_msg) FAIL("Reached unreachable", _msg)
-#define ASSERT(tst) \
-  (!(tst) ? FAIL("Assertion Error", "assertion failed") : (void)0)
+#define ASSERT(tst, msg) (!(tst) ? FAIL("Assertion Error", (msg)) : (void)0)
 
 _Noreturn void error(char* fmt, ...);
 

@@ -28,8 +28,8 @@ typedef uint64_t Value;
 #define IS_NUMBER(val) (((val)&QNAN) != QNAN)
 
 #define BOOL_VAL(v) ((v) ? TRUE_VAL : FALSE_VAL)
-#define AS_BOOL(b) ((b) == TAG_TRUE)
-#define IS_BOOL(b) (((b) | 1) == TAG_TRUE)
+#define AS_BOOL(b) ((b) == TRUE_VAL)
+#define IS_BOOL(b) (((b) | 1) == TRUE_VAL)
 
 #define OBJ_VAL(obj) ((Value)((uint64_t)(uintptr_t)(obj) | TAG_OBJ))
 #define AS_OBJ(val) ((Obj*)(uintptr_t)((val) & ~(TAG_OBJ)))
@@ -66,5 +66,6 @@ void free_value_pool(ValuePool* vp, VM* vm);
 int write_value(ValuePool* vp, Value v, VM* vm);
 char* get_value_type(Value val);
 void print_value(Value val);
+bool is_falsey_value(Value v);
 
 #endif  // EVE_VALUE_H

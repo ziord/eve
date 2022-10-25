@@ -8,7 +8,10 @@ int main() {
   Code code;
   init_code(&code);
   VM vm = new_vm();
-  Parser parser = new_parser("5e2 - 0x6af * 7.67 / 2");
+  // "5e2 - 0x6af * 7.67 / 2" | "2 * 4 ** 3" | "2 % 4 -- 1"
+  // --++--2
+  Parser parser =
+      new_parser("5e2 - 0x6af * 7.67 / 2 % 2 * 4 ** 3 + 2 % 4 -- 1");  //
   AstNode* root = parse(&parser);
   Compiler compiler = new_compiler(root, &code, &vm);
   compile(&compiler);

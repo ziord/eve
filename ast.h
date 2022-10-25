@@ -1,6 +1,7 @@
 #ifndef EVE_AST_H
 #define EVE_AST_H
 
+#include "lexer.h"
 #include "memory.h"
 
 typedef enum {
@@ -8,6 +9,10 @@ typedef enum {
   OP_MINUS,
   OP_MUL,
   OP_DIV,
+  OP_POW,
+  OP_MOD,
+  OP_NOT,
+  OP_BW_COMPL,
 } OpTy;
 
 typedef enum {
@@ -54,8 +59,10 @@ union AstNode {
 
 void init_store(NodeStore* store);
 void free_store(NodeStore* store);
+OpTy get_op(TokenTy ty);
 AstNode* new_node(NodeStore* store);
 AstNode* new_num(NodeStore* store, double val, int line);
+AstNode* new_unary(NodeStore* store, AstNode* node, int line, OpTy op);
 AstNode* new_binary(
     NodeStore* store,
     AstNode* left,

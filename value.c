@@ -37,3 +37,7 @@ void print_value(Value val) {
     printf("%g", AS_NUMBER(val));
   }
 }
+
+bool is_falsey_value(Value v) {
+  return (IS_NUMBER(v) && AS_NUMBER(v) || IS_BOOL(v) && !AS_BOOL(v));
+}

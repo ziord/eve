@@ -1,9 +1,11 @@
 #ifndef EVE_VM_H
 #define EVE_VM_H
 
+#include <math.h>
+
 #include "code.h"
-#include "util.h"
 #include "debug.h"
+#include "util.h"
 #define STACK_MAX 0xfff
 
 typedef enum {

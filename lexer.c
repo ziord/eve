@@ -51,6 +51,14 @@ inline char get_char(Lexer* lexer) {
   return *(lexer->current - 1);
 }
 
+inline static bool check(Lexer* lexer, char ch) {
+  if (PEEK(lexer) == ch) {
+    advance(lexer);
+    return true;
+  }
+  return false;
+}
+
 void skip_whitespace(Lexer* lexer) {
   for (;;) {
     switch (PEEK(lexer)) {
@@ -112,7 +120,13 @@ Token get_token(Lexer* lexer) {
     case '/':
       return new_token(lexer, TK_F_SLASH);
     case '*':
-      return new_token(lexer, TK_STAR);
+      return new_token(lexer, check(lexer, '*') ? TK_STAR_STAR : TK_STAR);
+    case '!':
+      return new_token(lexer, TK_EXC_MARK);
+    case '~':
+      return new_token(lexer, TK_TILDE);
+    case '%':
+      return new_token(lexer, TK_PERCENT);
     default:
       return error_token(lexer, "unknown token type");
   }

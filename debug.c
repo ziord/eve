@@ -32,6 +32,16 @@ int dis_instruction(Code* code, int index) {
       return plain_instruction("$DIVIDE", index);
     case $SUBTRACT:
       return plain_instruction("$SUBTRACT", index);
+    case $NEGATE:
+      return plain_instruction("$NEGATE", index);
+    case $MOD:
+      return plain_instruction("$MOD", index);
+    case $POW:
+      return plain_instruction("$POW", index);
+    case $NOT:
+      return plain_instruction("$NOT", index);
+    case $BW_INVERT:
+      return plain_instruction("$BW_INVERT", index);
     case $RET:
       return plain_instruction("$RET", index);
     case $LOAD_CONST:

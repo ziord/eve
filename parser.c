@@ -9,6 +9,8 @@ typedef enum BindingPower {
   BP_ASSIGNMENT,  //
   BP_TERM,        // +, -
   BP_FACTOR,      // /, *, %
+  BP_POWER,       // **
+  BP_UNARY,       // !, -, +, ~
 } BindingPower;
 // clang-format on
 
@@ -20,14 +22,19 @@ typedef struct {
 
 static AstNode* _parse(Parser* parser, BindingPower bp);
 static AstNode* parse_num(Parser* parser);
+static AstNode* parse_unary(Parser* parser);
 static AstNode* parse_binary(Parser* parser, AstNode* left);
 
 // clang-format off
 ParseTable p_table[] = {
   [TK_NUM] = {.bp = BP_NONE, .prefix = parse_num, .infix = NULL},
-  [TK_PLUS] = {.bp = BP_TERM, .prefix = NULL, .infix = parse_binary},
-  [TK_MINUS] = {.bp = BP_TERM, .prefix = NULL, .infix = parse_binary},
+  [TK_PLUS] = {.bp = BP_TERM, .prefix = parse_unary, .infix = parse_binary},
+  [TK_MINUS] = {.bp = BP_TERM, .prefix = parse_unary, .infix = parse_binary},
   [TK_STAR] = {.bp = BP_FACTOR, .prefix = NULL, .infix = parse_binary},
+  [TK_PERCENT] = {.bp = BP_FACTOR, .prefix = NULL, .infix = parse_binary},
+  [TK_STAR_STAR] = {.bp = BP_POWER, .prefix = NULL, .infix = parse_binary},
+  [TK_EXC_MARK] = {.bp = BP_UNARY, .prefix = parse_unary, .infix = NULL},
+  [TK_TILDE] = {.bp = BP_UNARY, .prefix = parse_unary, .infix = NULL},
   [TK_F_SLASH] = {.bp = BP_FACTOR, .prefix = NULL, .infix = parse_binary},
   [TK_EOF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ERROR] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -82,7 +89,7 @@ static AstNode* _parse(Parser* parser, BindingPower bp) {
     parse_error(parser, parser->current_tk, E002, NULL);
   }
   AstNode* node = pref(parser);
-  while (bp <= p_table[parser->current_tk.ty].bp) {
+  while (bp < p_table[parser->current_tk.ty].bp) {
     InfixFn inf = p_table[parser->current_tk.ty].infix;
     node = inf(parser, node);
   }
@@ -100,31 +107,25 @@ static AstNode* parse_num(Parser* parser) {
   } else {
     val = strtod(tok.value, &endptr);
   }
-  ASSERT(tok.value + tok.length == endptr);
+  ASSERT(tok.value + tok.length == endptr, "failed to convert number");
   AstNode* node = new_num(&parser->store, val, line);
   return node;
+}
+
+static AstNode* parse_unary(Parser* parser) {
+  OpTy op = get_op(parser->current_tk.ty);
+  int line = parser->current_tk.line;
+  BindingPower bp = p_table[parser->current_tk.ty].bp;
+  advance(parser);
+  AstNode* node = _parse(parser, bp);
+  return new_unary(&parser->store, node, line, op);
 }
 
 static AstNode* parse_binary(Parser* parser, AstNode* left) {
   int line = parser->current_tk.line;
   BindingPower bp = p_table[parser->current_tk.ty].bp;
-  OpTy op = 0xff;
-  switch (parser->current_tk.ty) {
-    case TK_PLUS:
-      op = OP_PLUS;
-      break;
-    case TK_MINUS:
-      op = OP_MINUS;
-      break;
-    case TK_F_SLASH:
-      op = OP_DIV;
-      break;
-    case TK_STAR:
-      op = OP_MUL;
-      break;
-    default:
-      parse_error(parser, parser->current_tk, E003, NULL);
-  }
+  // this is guaranteed to be valid by the ParseTable
+  OpTy op = get_op(parser->current_tk.ty);
   advance(parser);
   AstNode* right = _parse(parser, bp);
   return new_binary(&parser->store, left, right, line, op);

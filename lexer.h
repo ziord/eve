@@ -6,13 +6,17 @@
 
 // clang-format off
 typedef enum {
-  TK_NUM,     // 1 | 3.5
-  TK_PLUS,    // +
-  TK_MINUS,   // -
-  TK_STAR,    // *
-  TK_F_SLASH, // /
-  TK_EOF,     // EOF
-  TK_ERROR,   // <error>
+  TK_NUM,           // 1 | 3.5
+  TK_PLUS,          // +
+  TK_MINUS,         // -
+  TK_STAR,          // *
+  TK_STAR_STAR,     // **
+  TK_EXC_MARK,      // !
+  TK_TILDE,         // ~
+  TK_F_SLASH,       // /
+  TK_PERCENT,       // %
+  TK_EOF,           // EOF
+  TK_ERROR,         // <error>
 } TokenTy;
 // clang-format on
 

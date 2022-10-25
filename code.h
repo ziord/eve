@@ -4,7 +4,23 @@
 #include "value.h"
 
 typedef uint8_t byte_t;
-typedef enum { $ADD, $SUBTRACT, $MULTIPLY, $DIVIDE, $LOAD_CONST, $RET } OpCode;
+typedef enum {
+  // Arith
+  $ADD,
+  $SUBTRACT,
+  $MULTIPLY,
+  $DIVIDE,
+  $NEGATE,
+  $MOD,
+  $POW,
+  // Conditional
+  $NOT,
+  // Bitwise
+  $BW_INVERT,
+  // Other
+  $LOAD_CONST,
+  $RET
+} OpCode;
 typedef struct {
   int length;
   int capacity;

@@ -11,10 +11,28 @@
     } else { \
       return runtime_error( \
           "%s: %s and %s", \
-          "Unsupported operand types for " "'" #_op "'", \
+          "Unsupported operand types for " \
+          "'" #_op "'", \
           get_value_type(_l), \
           get_value_type(_r)); \
     } \
+  }
+#define BINARY_CHECK(vm, _op, _a, _b, check) \
+  if (!check((_a)) || !check((_b))) { \
+    return runtime_error( \
+        "%s: %s and %s", \
+        "Unsupported operand types for " \
+        "'" #_op "'", \
+        get_value_type(_a), \
+        get_value_type(_b)); \
+  }
+#define UNARY_CHECK(vm, _op, _a, check) \
+  if (!check((_a))) { \
+    return runtime_error( \
+        "%s: %s and %s", \
+        "Unsupported operand type for " \
+        "'" #_op "'", \
+        get_value_type(_a)); \
   }
 
 inline static Value pop_stack(VM* vm) {
@@ -89,6 +107,39 @@ IResult run(VM* vm) {
       }
       case $MULTIPLY: {
         BINARY_OP(vm, *)
+        break;
+      }
+      case $POW: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        BINARY_CHECK(vm, **, a, b, IS_NUMBER);
+        double res = pow(AS_NUMBER(a), AS_NUMBER(b));
+        push_stack(vm, NUMBER_VAL(res));
+        break;
+      }
+      case $MOD: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        BINARY_CHECK(vm, %, a, b, IS_NUMBER);
+        double res = fmod(AS_NUMBER(a), AS_NUMBER(b));
+        push_stack(vm, NUMBER_VAL(res));
+        break;
+      }
+      case $NOT: {
+        Value v = pop_stack(vm);
+        push_stack(vm, BOOL_VAL(!is_falsey_value(v)));
+        break;
+      }
+      case $NEGATE: {
+        Value v = pop_stack(vm);
+        UNARY_CHECK(vm, -, v, IS_NUMBER);
+        push_stack(vm, NUMBER_VAL(-AS_NUMBER(v)));
+        break;
+      }
+      case $BW_INVERT: {
+        Value v = pop_stack(vm);
+        UNARY_CHECK(vm, ~, v, IS_NUMBER);
+        push_stack(vm, NUMBER_VAL((~(uint64_t)AS_NUMBER(v))));
         break;
       }
       default:

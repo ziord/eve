@@ -19,6 +19,11 @@ typedef enum {
   OP_LOG_EQ,
   OP_LSHIFT,
   OP_RSHIFT,
+  OP_OR,
+  OP_AND,
+  OP_BW_AND,
+  OP_BW_XOR,
+  OP_BW_OR,
   OP_NOT,
   OP_BW_COMPL,
 } OpTy;

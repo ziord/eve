@@ -16,6 +16,18 @@ int constant_instruction(char* inst, Code* code, int offset) {
   return ++offset;
 }
 
+int jump_instruction(char* inst, Code* code, int offset, int sign) {
+  // jmp offset -> op-arg (2 bytes)
+  int jmp_offset = code->bytes[offset + 1] << 8;
+  jmp_offset |= code->bytes[offset + 2];
+  printf(
+      "%-16s\t%3d -> %d\n",
+      inst,
+      offset,
+      (jmp_offset * sign) + offset + 3);
+  return offset + 3;
+}
+
 int dis_instruction(Code* code, int index) {
   if (index > 0 && code->lines[index] == code->lines[index - 1]) {
     printf("   |\t%04d\t", index);
@@ -58,6 +70,18 @@ int dis_instruction(Code* code, int index) {
       return plain_instruction("$BW_LSHIFT", index);
     case $BW_RSHIFT:
       return plain_instruction("$BW_RSHIFT", index);
+    case $BW_AND:
+      return plain_instruction("$BW_AND", index);
+    case $BW_OR:
+      return plain_instruction("$BW_OR", index);
+    case $BW_XOR:
+      return plain_instruction("$BW_XOR", index);
+    case $JMP:
+      return jump_instruction("$JMP", code, index, 1);
+    case $JMP_FALSE:
+      return jump_instruction("$JMP_FALSE", code, index, 1);
+    case $JMP_FALSE_OR_POP:
+      return jump_instruction("$JMP_FALSE_OR_POP", code, index, 1);
     case $RET:
       return plain_instruction("$RET", index);
     case $LOAD_CONST:

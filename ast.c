@@ -53,6 +53,16 @@ OpTy get_op(TokenTy ty) {
       return OP_LSHIFT;
     case TK_RSHIFT:
       return OP_RSHIFT;
+    case TK_PIPE:
+      return OP_BW_OR;
+    case TK_D_PIPE:
+      return OP_OR;
+    case TK_CARET:
+      return OP_BW_XOR;
+    case TK_AMP:
+      return OP_BW_AND;
+    case TK_D_AMP:
+      return OP_AND;
     default:
       return 0xff;
   }

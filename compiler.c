@@ -19,6 +19,9 @@ OpCode op_table[][2] = {
     [OP_NOT_EQ] = {0xff, $NOT_EQ},
     [OP_LSHIFT] = {0xff, $BW_LSHIFT},
     [OP_RSHIFT] = {0xff, $BW_RSHIFT},
+    [OP_BW_AND] = {0xff, $BW_AND},
+    [OP_BW_OR] = {0xff, $BW_OR},
+    [OP_BW_XOR] = {0xff, $BW_XOR},
     [OP_BW_COMPL] = {$BW_INVERT, 0xff},
 };
 
@@ -58,12 +61,36 @@ void c_unary(Compiler* compiler, AstNode* node) {
   }
 }
 
+void c_and(Compiler* compiler, BinaryNode* node) {
+  // x && y => x == false ? skip y
+  c_(compiler, node->l_node);
+  int idx = emit_jump(compiler, $JMP_FALSE_OR_POP, node->line);
+  c_(compiler, node->r_node);
+  patch_jump(compiler, idx);
+}
+
+void c_or(Compiler* compiler, BinaryNode* node) {
+  // x || y => x == true ? skip y
+  c_(compiler, node->l_node);
+  int skip_jmp_idx = emit_jump(compiler, $JMP_FALSE, node->line);
+  int end_jmp_idx = emit_jump(compiler, $JMP, node->line);
+  patch_jump(compiler, skip_jmp_idx);
+  c_(compiler, node->r_node);
+  patch_jump(compiler, end_jmp_idx);
+}
+
 void c_binary(Compiler* compiler, AstNode* node) {
   BinaryNode* bin = CAST(BinaryNode*, node);
-  c_(compiler, bin->l_node);
-  c_(compiler, bin->r_node);
-  ASSERT(op_table[bin->op][1] != 0xff, "binary opcode should be defined");
-  emit_byte(compiler, op_table[bin->op][1], bin->line);
+  if (bin->op == OP_OR) {
+    c_or(compiler, bin);
+  } else if (bin->op == OP_AND) {
+    c_and(compiler, bin);
+  } else {
+    c_(compiler, bin->l_node);
+    c_(compiler, bin->r_node);
+    ASSERT(op_table[bin->op][1] != 0xff, "binary opcode should be defined");
+    emit_byte(compiler, op_table[bin->op][1], bin->line);
+  }
 }
 
 void c_(Compiler* compiler, AstNode* node) {

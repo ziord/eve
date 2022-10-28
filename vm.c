@@ -1,7 +1,9 @@
 #include "vm.h"
 
 #define READ_BYTE(vm) (*(vm->ip++))
+#define READ_SHORT(vm) (vm->ip += 2, ((vm->ip[-2]) << 8u) | (vm->ip[-1]))
 #define READ_CONST(vm) (vm->code->vpool.values[READ_BYTE(vm)])
+#define PEEK_STACK(vm) (*(vm->sp - 1))
 #define BINARY_OP(vm, _op, _val_func) \
   { \
     Value _r = pop_stack(vm); \
@@ -168,6 +170,54 @@ IResult run(VM* vm) {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
         push_stack(vm, BOOL_VAL(!value_is_equal(a, b)));
+        break;
+      }
+      case $JMP: {
+        uint16_t offset = READ_SHORT(vm);
+        vm->ip += offset;
+        break;
+      }
+      case $JMP_FALSE: {
+        uint16_t offset = READ_SHORT(vm);
+        if (is_falsey_value(PEEK_STACK(vm))) {
+          vm->ip += offset;
+        }
+        break;
+      }
+      case $JMP_FALSE_OR_POP: {
+        uint16_t offset = READ_SHORT(vm);
+        if (is_falsey_value(PEEK_STACK(vm))) {
+          vm->ip += offset;
+        } else {
+          pop_stack(vm);
+        }
+        break;
+      }
+      case $BW_XOR: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        BINARY_CHECK(vm, %, a, b, IS_NUMBER);
+        push_stack(
+            vm,
+            NUMBER_VAL(((int64_t)AS_NUMBER(a) ^ (int64_t)AS_NUMBER(b))));
+        break;
+      }
+      case $BW_OR: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        BINARY_CHECK(vm, %, a, b, IS_NUMBER);
+        push_stack(
+            vm,
+            NUMBER_VAL(((int64_t)AS_NUMBER(a) | (int64_t)AS_NUMBER(b))));
+        break;
+      }
+      case $BW_AND: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        BINARY_CHECK(vm, %, a, b, IS_NUMBER);
+        push_stack(
+            vm,
+            NUMBER_VAL(((int64_t)AS_NUMBER(a) & (int64_t)AS_NUMBER(b))));
         break;
       }
       case $BW_LSHIFT: {

@@ -21,10 +21,16 @@ typedef enum {
   $GREATER,
   $LESS_OR_EQ,
   $GREATER_OR_EQ,
+  $JMP,
+  $JMP_FALSE,
+  $JMP_FALSE_OR_POP,
+  // Bitwise
   $BW_LSHIFT,
   $BW_RSHIFT,
-  // Bitwise
   $BW_INVERT,
+  $BW_AND,
+  $BW_XOR,
+  $BW_OR,
   // Other
   $LOAD_CONST,
   $RET

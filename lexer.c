@@ -172,10 +172,16 @@ Token get_token(Lexer* lexer) {
       return new_token(lexer, TK_TILDE);
     case '%':
       return new_token(lexer, TK_PERCENT);
+    case '^':
+      return new_token(lexer, TK_CARET);
     case '*':
       return new_token(lexer, check(lexer, '*') ? TK_STAR_STAR : TK_STAR);
     case '=':
       return new_token(lexer, check(lexer, '=') ? TK_EQ_EQ : TK_EQ);
+    case '&':
+      return new_token(lexer, check(lexer, '&') ? TK_D_AMP : TK_AMP);
+    case '|':
+      return new_token(lexer, check(lexer, '|') ? TK_D_PIPE : TK_PIPE);
     case '!':
       return new_token(lexer, check(lexer, '=') ? TK_NOT_EQ : TK_EXC_MARK);
     case '>':

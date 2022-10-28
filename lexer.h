@@ -19,6 +19,11 @@ typedef enum {
   TK_GRT,           // <
   TK_LESS,          // >
   TK_EQ,            // =
+  TK_AMP,           // &
+  TK_CARET,         // ^
+  TK_PIPE,          // |
+  TK_D_PIPE,        // ||
+  TK_D_AMP,         // &&
   TK_GRT_EQ,        // >=
   TK_LESS_EQ,       // <=
   TK_NOT_EQ,        // !=

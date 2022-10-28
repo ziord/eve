@@ -45,3 +45,10 @@ bool is_falsey_value(Value v) {
       IS_NUMBER(v) && !AS_NUMBER(v) || (IS_BOOL(v) && !AS_BOOL(v))
       || IS_NONE(v));
 }
+
+bool value_is_equal(Value a, Value b) {
+  if (IS_NUMBER(a) && IS_NUMBER(b)) {
+    return AS_NUMBER(a) == AS_NUMBER(b);
+  }
+  return a == b;
+}

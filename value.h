@@ -69,5 +69,6 @@ int write_value(ValuePool* vp, Value v, VM* vm);
 char* get_value_type(Value val);
 void print_value(Value val);
 bool is_falsey_value(Value v);
+bool value_is_equal(Value a, Value b);
 
 #endif  // EVE_VALUE_H

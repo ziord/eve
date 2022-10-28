@@ -2,12 +2,12 @@
 
 #define READ_BYTE(vm) (*(vm->ip++))
 #define READ_CONST(vm) (vm->code->vpool.values[READ_BYTE(vm)])
-#define BINARY_OP(vm, _op) \
+#define BINARY_OP(vm, _op, _val_func) \
   { \
     Value _r = pop_stack(vm); \
     Value _l = pop_stack(vm); \
     if (IS_NUMBER(_l) && IS_NUMBER(_r)) { \
-      push_stack(vm, NUMBER_VAL(AS_NUMBER(_l) _op AS_NUMBER(_r))); \
+      push_stack(vm, _val_func(AS_NUMBER(_l) _op AS_NUMBER(_r))); \
     } else { \
       return runtime_error( \
           "%s: %s and %s", \
@@ -94,19 +94,35 @@ IResult run(VM* vm) {
         return RESULT_SUCCESS;
       }
       case $ADD: {
-        BINARY_OP(vm, +)
+        BINARY_OP(vm, +, NUMBER_VAL)
         break;
       }
       case $SUBTRACT: {
-        BINARY_OP(vm, -)
+        BINARY_OP(vm, -, NUMBER_VAL)
         break;
       }
       case $DIVIDE: {
-        BINARY_OP(vm, /)
+        BINARY_OP(vm, /, NUMBER_VAL)
         break;
       }
       case $MULTIPLY: {
-        BINARY_OP(vm, *)
+        BINARY_OP(vm, *, NUMBER_VAL)
+        break;
+      }
+      case $LESS: {
+        BINARY_OP(vm, <, BOOL_VAL);
+        break;
+      }
+      case $GREATER: {
+        BINARY_OP(vm, >, BOOL_VAL);
+        break;
+      }
+      case $LESS_OR_EQ: {
+        BINARY_OP(vm, <=, BOOL_VAL);
+        break;
+      }
+      case $GREATER_OR_EQ: {
+        BINARY_OP(vm, >=, BOOL_VAL);
         break;
       }
       case $POW: {
@@ -139,7 +155,39 @@ IResult run(VM* vm) {
       case $BW_INVERT: {
         Value v = pop_stack(vm);
         UNARY_CHECK(vm, ~, v, IS_NUMBER);
-        push_stack(vm, NUMBER_VAL((~(uint64_t)AS_NUMBER(v))));
+        push_stack(vm, NUMBER_VAL((~(int64_t)AS_NUMBER(v))));
+        break;
+      }
+      case $EQ: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        push_stack(vm, BOOL_VAL(value_is_equal(a, b)));
+        break;
+      }
+      case $NOT_EQ: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        push_stack(vm, BOOL_VAL(!value_is_equal(a, b)));
+        break;
+      }
+      case $BW_LSHIFT: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        BINARY_CHECK(vm, <<, a, b, IS_NUMBER);
+        push_stack(
+            vm,
+            NUMBER_VAL(
+                (double)((int64_t)AS_NUMBER(a) << (int64_t)AS_NUMBER(b))));
+        break;
+      }
+      case $BW_RSHIFT: {
+        Value b = pop_stack(vm);
+        Value a = pop_stack(vm);
+        BINARY_CHECK(vm, >>, a, b, IS_NUMBER);
+        push_stack(
+            vm,
+            NUMBER_VAL(
+                (double)((int64_t)AS_NUMBER(a) >> (int64_t)AS_NUMBER(b))));
         break;
       }
       default:

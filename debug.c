@@ -42,6 +42,22 @@ int dis_instruction(Code* code, int index) {
       return plain_instruction("$NOT", index);
     case $BW_INVERT:
       return plain_instruction("$BW_INVERT", index);
+    case $LESS:
+      return plain_instruction("$LESS", index);
+    case $LESS_OR_EQ:
+      return plain_instruction("$LESS_OR_EQ", index);
+    case $GREATER:
+      return plain_instruction("$GREATER", index);
+    case $GREATER_OR_EQ:
+      return plain_instruction("$GREATER_OR_EQ", index);
+    case $EQ:
+      return plain_instruction("$EQ", index);
+    case $NOT_EQ:
+      return plain_instruction("$NOT_EQ", index);
+    case $BW_LSHIFT:
+      return plain_instruction("$BW_LSHIFT", index);
+    case $BW_RSHIFT:
+      return plain_instruction("$BW_RSHIFT", index);
     case $RET:
       return plain_instruction("$RET", index);
     case $LOAD_CONST:

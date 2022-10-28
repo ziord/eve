@@ -16,6 +16,15 @@ typedef enum {
   TK_TILDE,         // ~
   TK_F_SLASH,       // /
   TK_PERCENT,       // %
+  TK_GRT,           // <
+  TK_LESS,          // >
+  TK_EQ,            // =
+  TK_GRT_EQ,        // >=
+  TK_LESS_EQ,       // <=
+  TK_NOT_EQ,        // !=
+  TK_EQ_EQ,         // ==
+  TK_LSHIFT,        // >>
+  TK_RSHIFT,        // <<
   TK_FALSE,         // false
   TK_TRUE,          // true
   TK_NONE,          // None

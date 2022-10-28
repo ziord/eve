@@ -37,6 +37,22 @@ OpTy get_op(TokenTy ty) {
       return OP_DIV;
     case TK_PERCENT:
       return OP_MOD;
+    case TK_LESS:
+      return OP_LESS;
+    case TK_GRT:
+      return OP_GRT;
+    case TK_LESS_EQ:
+      return OP_LESS_EQ;
+    case TK_GRT_EQ:
+      return OP_GRT_EQ;
+    case TK_NOT_EQ:
+      return OP_NOT_EQ;
+    case TK_EQ_EQ:
+      return OP_LOG_EQ;
+    case TK_LSHIFT:
+      return OP_LSHIFT;
+    case TK_RSHIFT:
+      return OP_RSHIFT;
     default:
       return 0xff;
   }

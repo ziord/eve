@@ -119,7 +119,7 @@ Token lex_num(Lexer* lexer, char start) {
 TokenTy keyword_type(Lexer* lexer, char ch) {
   // keywords:
   // true, false, None, struct, while,
-  // return, if, else, fn, let, is, show
+  // return, if, else, fn, let, show
   switch (ch) {
     case 't':
       return expect(lexer, "rue", 1, 3, TK_TRUE);
@@ -168,14 +168,28 @@ Token get_token(Lexer* lexer) {
       return new_token(lexer, TK_MINUS);
     case '/':
       return new_token(lexer, TK_F_SLASH);
-    case '*':
-      return new_token(lexer, check(lexer, '*') ? TK_STAR_STAR : TK_STAR);
-    case '!':
-      return new_token(lexer, TK_EXC_MARK);
     case '~':
       return new_token(lexer, TK_TILDE);
     case '%':
       return new_token(lexer, TK_PERCENT);
+    case '*':
+      return new_token(lexer, check(lexer, '*') ? TK_STAR_STAR : TK_STAR);
+    case '=':
+      return new_token(lexer, check(lexer, '=') ? TK_EQ_EQ : TK_EQ);
+    case '!':
+      return new_token(lexer, check(lexer, '=') ? TK_NOT_EQ : TK_EXC_MARK);
+    case '>':
+      return new_token(
+          lexer,
+          check(lexer, '>')       ? TK_RSHIFT
+              : check(lexer, '=') ? TK_GRT_EQ
+                                  : TK_GRT);
+    case '<':
+      return new_token(
+          lexer,
+          check(lexer, '<')       ? TK_LSHIFT
+              : check(lexer, '=') ? TK_LESS_EQ
+                                  : TK_LESS);
     default:
       return error_token(lexer, "unknown token type");
   }

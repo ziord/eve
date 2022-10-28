@@ -7,6 +7,9 @@ typedef AstNode* (*InfixFn)(Parser*, AstNode*);
 typedef enum BindingPower {
   BP_NONE,        // other
   BP_ASSIGNMENT,  //
+  BP_EQUALITY,    // !=, ==
+  BP_COMPARISON,  // >, >=, <, <=
+  BP_SHIFT,       // >>, <<
   BP_TERM,        // +, -
   BP_FACTOR,      // /, *, %
   BP_POWER,       // **
@@ -37,6 +40,15 @@ ParseTable p_table[] = {
   [TK_EXC_MARK] = {.bp = BP_UNARY, .prefix = parse_unary, .infix = NULL},
   [TK_TILDE] = {.bp = BP_UNARY, .prefix = parse_unary, .infix = NULL},
   [TK_F_SLASH] = {.bp = BP_FACTOR, .prefix = NULL, .infix = parse_binary},
+  [TK_GRT] = {.bp = BP_COMPARISON, .prefix = NULL, .infix = parse_binary},
+  [TK_LESS] = {.bp = BP_COMPARISON, .prefix = NULL, .infix = parse_binary},
+  [TK_GRT_EQ] = {.bp = BP_COMPARISON, .prefix = NULL, .infix = parse_binary},
+  [TK_LESS_EQ] = {.bp = BP_COMPARISON, .prefix = NULL, .infix = parse_binary},
+  [TK_NOT_EQ] = {.bp = BP_EQUALITY, .prefix = NULL, .infix = parse_binary},
+  [TK_EQ_EQ] = {.bp = BP_EQUALITY, .prefix = NULL, .infix = parse_binary},
+  [TK_EQ] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_LSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
+  [TK_RSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
   [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},

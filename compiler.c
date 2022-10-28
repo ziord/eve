@@ -11,6 +11,14 @@ OpCode op_table[][2] = {
     [OP_MOD] = {0xff, $MOD},
     [OP_NOT] = {$NOT, 0xff},
     [OP_POW] = {0xff, $POW},
+    [OP_LESS] = {0xff, $LESS},
+    [OP_LESS_EQ] = {0xff, $LESS_OR_EQ},
+    [OP_GRT] = {0xff, $GREATER},
+    [OP_GRT_EQ] = {0xff, $GREATER_OR_EQ},
+    [OP_LOG_EQ] = {0xff, $EQ},
+    [OP_NOT_EQ] = {0xff, $NOT_EQ},
+    [OP_LSHIFT] = {0xff, $BW_LSHIFT},
+    [OP_RSHIFT] = {0xff, $BW_RSHIFT},
     [OP_BW_COMPL] = {$BW_INVERT, 0xff},
 };
 

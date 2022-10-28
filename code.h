@@ -15,6 +15,14 @@ typedef enum {
   $POW,
   // Conditional
   $NOT,
+  $EQ,
+  $NOT_EQ,
+  $LESS,
+  $GREATER,
+  $LESS_OR_EQ,
+  $GREATER_OR_EQ,
+  $BW_LSHIFT,
+  $BW_RSHIFT,
   // Bitwise
   $BW_INVERT,
   // Other

@@ -198,6 +198,14 @@ Token get_token(Lexer* lexer) {
       return new_token(lexer, TK_LSQ_BRACK);
     case ']':
       return new_token(lexer, TK_RSQ_BRACK);
+    case '#':
+      return new_token(lexer, TK_HASH);
+    case ':':
+      return new_token(lexer, TK_COLON);
+    case '{':
+      return new_token(lexer, TK_LCURLY);
+    case '}':
+      return new_token(lexer, TK_RCURLY);
     case '/':
       return new_token(lexer, TK_FSLASH);
     case '~':

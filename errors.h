@@ -7,6 +7,8 @@ typedef enum {
   E002,
   E003,
   E004,
+  E005,
+  E006,
 } ErrorTy;
 
 typedef struct {

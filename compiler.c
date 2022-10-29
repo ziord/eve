@@ -50,11 +50,23 @@ void c_str(Compiler* compiler, AstNode* node) {
 
 void c_list(Compiler* compiler, AstNode* node) {
   ListNode* list = CAST(ListNode*, node);
-  for (int i = 0; i < list->len; i++) {
+  // push arguments in reverse order
+  for (int i = list->len - 1; i >= 0; i--) {
     c_(compiler, list->elems[i]);
   }
   emit_byte(compiler, $BUILD_LIST, list->line);
   emit_byte(compiler, (byte_t)list->len, list->line);
+}
+
+void c_map(Compiler* compiler, AstNode* node) {
+  MapNode* map = CAST(MapNode*, node);
+  // push arguments in reverse order
+  for (int i = map->length - 1; i >= 0; i--) {
+    c_(compiler, map->items[i][0]);  // key
+    c_(compiler, map->items[i][1]);  // value
+  }
+  emit_byte(compiler, $BUILD_MAP, map->line);
+  emit_byte(compiler, (byte_t)map->length, map->line);
 }
 
 void c_unit(Compiler* compiler, AstNode* node) {
@@ -127,11 +139,15 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_UNIT:
       c_unit(compiler, node);
+      break;
     case AST_STR:
       c_str(compiler, node);
       break;
     case AST_LIST:
       c_list(compiler, node);
+      break;
+    case AST_MAP:
+      c_map(compiler, node);
       break;
     default:
       UNREACHABLE("compile - unknown ast node");

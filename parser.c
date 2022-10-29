@@ -35,8 +35,9 @@ static AstNode* parse_unary(Parser* parser);
 static AstNode* parse_literal(Parser* parser);
 static AstNode* parse_binary(Parser* parser, AstNode* left);
 static AstNode* parse_string(Parser* parser);
-static AstNode* paren_expr(Parser* parser);
-static AstNode* list_expr(Parser* parser);
+static AstNode* parse_grouping(Parser* parser);
+static AstNode* parse_list(Parser* parser);
+static AstNode* parse_map(Parser* parser);
 
 // clang-format off
 ParseTable p_table[] = {
@@ -59,10 +60,15 @@ ParseTable p_table[] = {
   [TK_PIPE_PIPE] = {.bp = BP_OR, .prefix = NULL, .infix = parse_binary},
   [TK_AMP_AMP] = {.bp = BP_AND, .prefix = NULL, .infix = parse_binary},
   [TK_PIPE] = {.bp = BP_BW_OR, .prefix = NULL, .infix = parse_binary},
-  [TK_LBRACK] = {.bp = BP_NONE, .prefix = paren_expr, .infix = NULL},
+  [TK_LBRACK] = {.bp = BP_NONE, .prefix = parse_grouping, .infix = NULL},
   [TK_RBRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
-  [TK_LSQ_BRACK] = {.bp = BP_NONE, .prefix = list_expr, .infix = NULL},
+  [TK_LSQ_BRACK] = {.bp = BP_NONE, .prefix = parse_list, .infix = NULL},
   [TK_RSQ_BRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_HASH] = {.bp = BP_NONE, .prefix = parse_map, .infix = NULL},
+  [TK_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_LCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_RCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_CARET] = {.bp = BP_XOR, .prefix = NULL, .infix = parse_binary},
   [TK_AMP] = {.bp = BP_BW_AND, .prefix = NULL, .infix = parse_binary},
   [TK_LSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
@@ -160,14 +166,14 @@ static AstNode* parse_string(Parser* parser) {
   return node;
 }
 
-static AstNode* paren_expr(Parser* parser) {
+static AstNode* parse_grouping(Parser* parser) {
   advance(parser);  // skip '(' token
   AstNode* node = expr(parser);
   consume(parser, TK_RBRACK);
   return node;
 }
 
-static AstNode* list_expr(Parser* parser) {
+static AstNode* parse_list(Parser* parser) {
   advance(parser);  // skip '[' token
   AstNode* node = new_node(&parser->store);
   ListNode* list = &node->list;
@@ -182,6 +188,33 @@ static AstNode* list_expr(Parser* parser) {
       parse_error(parser, parser->current_tk, E004, NULL);
     }
     list->elems[list->len++] = expr(parser);
+  }
+  return node;
+}
+
+static AstNode* parse_map(Parser* parser) {
+  // #{key: value}
+  int line = parser->current_tk.line;
+  advance(parser);  // skip '#' token
+  consume(parser, TK_LCURLY);
+  AstNode* node = new_node(&parser->store);
+  MapNode* map = &node->map;
+  map->line = line;
+  map->length = 0;
+  map->type = AST_MAP;
+  AstNode *value, *key;
+  while (!match(parser, TK_RCURLY)) {
+    if (map->length > BYTE_MAX) {
+      parse_error(parser, parser->current_tk, E006, NULL);
+    }
+    if (map->length > 0) {
+      consume(parser, TK_COMMA);
+    }
+    key = expr(parser);
+    consume(parser, TK_COLON);
+    value = expr(parser);
+    map->items[map->length][0] = key;
+    map->items[map->length++][1] = value;
   }
   return node;
 }

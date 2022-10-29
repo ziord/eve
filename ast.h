@@ -32,6 +32,7 @@ typedef enum {
   AST_NUM,
   AST_STR,
   AST_LIST,
+  AST_MAP,
   AST_UNIT,
   AST_UNARY,
   AST_BINARY,
@@ -58,6 +59,13 @@ typedef struct {
   int len;
   AstNode* elems[BYTE_MAX];
 } ListNode;
+
+typedef struct {
+  AstTy type;
+  int line;
+  int length;
+  AstNode* items[BYTE_MAX][2];  // key-value pairs
+} MapNode;
 
 typedef struct {
   AstTy type;
@@ -91,6 +99,7 @@ union AstNode {
   UnitNode unit;
   StringNode str;
   ListNode list;
+  MapNode map;
 };
 
 typedef struct {

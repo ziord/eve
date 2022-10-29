@@ -34,6 +34,7 @@ typedef enum {
   // Other
   $LOAD_CONST,
   $BUILD_LIST,
+  $BUILD_MAP,
   $RET
 } OpCode;
 typedef struct {

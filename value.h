@@ -41,10 +41,10 @@ typedef uint64_t Value;
 #define IS_OBJ(val) (((val) & (TAG_OBJ)) == (TAG_OBJ))
 
 #define IS_STRING(val) (is_object_type(val, OBJ_STR))
-#define AS_STRING(val) ((ObjString*)(AS_OBJ(val)))
 
-#define IS_LIST(val) (is_object_type(val, OBJ_LIST))
+#define AS_STRING(val) ((ObjString*)(AS_OBJ(val)))
 #define AS_LIST(val) ((ObjList*)(AS_OBJ(val)))
+#define AS_MAP(val) ((ObjHashMap*)(AS_OBJ(val)))
 
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)

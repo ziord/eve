@@ -93,6 +93,8 @@ int dis_instruction(Code* code, int index) {
       return constant_instruction("$LOAD_CONST", code, index);
     case $BUILD_LIST:
       return byte_instruction("$BUILD_LIST", code, index);
+    case $BUILD_MAP:
+      return byte_instruction("$BUILD_MAP", code, index);
     default:
       return plain_instruction("UNKNOWN_OPCODE", index);
   }

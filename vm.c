@@ -198,11 +198,24 @@ IResult run(VM* vm) {
       }
       case $BUILD_LIST: {
         ObjList* list = create_list(vm, READ_BYTE(vm));
-        for (int i = list->elems.length - 1, j = 0; i >= 0; i--, j++) {
-          list->elems.buffer[j] = PEEK_STACK_AT(vm, i);
+        for (int i = 0; i < list->elems.length; i++) {
+          list->elems.buffer[i] = PEEK_STACK_AT(vm, i);
         }
         vm->sp -= list->elems.length;
         push_stack(vm, OBJ_VAL(list));
+        break;
+      }
+      case $BUILD_MAP: {
+        uint32_t len = READ_BYTE(vm) * 2;
+        ObjHashMap* map = create_hashmap(vm);
+        Value key, val;
+        for (int i = 0; i < len; i += 2) {
+          val = PEEK_STACK_AT(vm, i);
+          key = PEEK_STACK_AT(vm, i + 1);
+          hashmap_put(map, vm, key, val);
+        }
+        vm->sp -= len;
+        push_stack(vm, OBJ_VAL(map));
         break;
       }
       case $BW_XOR: {

@@ -15,7 +15,8 @@ int main() {
   // 6 && 5 || 2
   // "\tfoxy issa \' \t \n nice!"
   // [1, 2, 0xff * 24, 5 * 3 -12, "fishy", [1, 2, 0xff * 24, 5 * 3 -12, "fishy"]]
-  Parser parser = new_parser("[1] == [1]");
+  // [#{"name": "jon", 5: 0xffff, 888: 5}, #{1: 5}]
+  Parser parser = new_parser("#{true: None, None: false, false: None}");
   AstNode* root = parse(&parser);
   Compiler compiler = new_compiler(root, &code, &vm);
   compile(&compiler);

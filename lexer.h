@@ -27,6 +27,10 @@ typedef enum {
   TK_RBRACK,        // )
   TK_LSQ_BRACK,     // [
   TK_RSQ_BRACK,     // ]
+  TK_LCURLY,        // {
+  TK_RCURLY,        // }
+  TK_HASH,          // #
+  TK_COLON,         // :
   TK_PIPE_PIPE,     // ||
   TK_AMP_AMP,       // &&
   TK_GRT_EQ,        // >=

@@ -29,6 +29,8 @@ char* get_object_type(Obj* obj) {
       return "string";
     case OBJ_LIST:
       return "list";
+    case OBJ_HMAP:
+      return "hashmap";
     default:
       UNREACHABLE("unknown object type");
   }
@@ -62,6 +64,29 @@ void print_object(Value val, Obj* obj) {
         }
       }
       printf("]");
+      break;
+    }
+    case OBJ_HMAP: {
+      ObjHashMap* map = AS_MAP(val);
+      printf("#{");
+      if (map->length) {
+        HashEntry* entry;
+        for (int i = 0, j = 0; i < map->capacity; i++) {
+          entry = &map->entries[i];
+          if (IS_NOTHING(entry->key)) {
+            // skip deleted and fresh entries
+            continue;
+          }
+          print_value(entry->key);
+          printf(": ");
+          print_value(entry->value);
+          if (j < map->length - 1) {
+            printf(", ");
+          }
+          j++;
+        }
+      }
+      printf("}");
       break;
     }
     default:
@@ -177,7 +202,8 @@ static uint32_t hash_object(Obj* obj) {
     case OBJ_STR:
       return ((ObjString*)obj)->hash;
     default:
-      UNREACHABLE("hash object");
+      // TODO: better error handling
+      error("Unhashable type '%s'", get_object_type(obj));
   }
 }
 
@@ -301,8 +327,9 @@ ObjString* hashmap_find_interned(
     return NULL;
   uint32_t capacity = table->capacity - 1;
   uint32_t index = hash & capacity;
+  uint32_t start_index = index;
   HashEntry* entry;
-  for (;;) {
+  do {
     entry = &table->entries[index];
     if (IS_NOTHING(entry->key)) {
       // NONE value indicates deleted.
@@ -317,5 +344,6 @@ ObjString* hashmap_find_interned(
       }
     }
     index = (index + 1) & capacity;
-  }
+  } while (start_index != index);
+  return NULL;
 }

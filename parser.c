@@ -29,11 +29,13 @@ typedef struct {
 } ParseTable;
 
 static AstNode* _parse(Parser* parser, BindingPower bp);
+static AstNode* expr(Parser* parser);
 static AstNode* parse_num(Parser* parser);
 static AstNode* parse_unary(Parser* parser);
 static AstNode* parse_literal(Parser* parser);
 static AstNode* parse_binary(Parser* parser, AstNode* left);
 static AstNode* parse_string(Parser* parser);
+static AstNode* paren_expr(Parser* parser);
 
 // clang-format off
 ParseTable p_table[] = {
@@ -56,6 +58,8 @@ ParseTable p_table[] = {
   [TK_PIPE_PIPE] = {.bp = BP_OR, .prefix = NULL, .infix = parse_binary},
   [TK_AMP_AMP] = {.bp = BP_AND, .prefix = NULL, .infix = parse_binary},
   [TK_PIPE] = {.bp = BP_BW_OR, .prefix = NULL, .infix = parse_binary},
+  [TK_LBRACK] = {.bp = BP_NONE, .prefix = paren_expr, .infix = NULL},
+  [TK_RBRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_CARET] = {.bp = BP_XOR, .prefix = NULL, .infix = parse_binary},
   [TK_AMP] = {.bp = BP_BW_AND, .prefix = NULL, .infix = parse_binary},
   [TK_LSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
@@ -153,6 +157,13 @@ static AstNode* parse_string(Parser* parser) {
   return node;
 }
 
+static AstNode* paren_expr(Parser* parser) {
+  advance(parser);
+  AstNode* node = expr(parser);
+  consume(parser, TK_RBRACK);
+  return node;
+}
+
 static AstNode* parse_literal(Parser* parser) {
   int false_val = 0, true_val = 0, none_val = 0;
   int line = parser->current_tk.line;
@@ -200,7 +211,7 @@ static AstNode* parse_binary(Parser* parser, AstNode* left) {
   return new_binary(&parser->store, left, right, line, op);
 }
 
-AstNode* expr(Parser* parser) {
+static AstNode* expr(Parser* parser) {
   return _parse(parser, BP_ASSIGNMENT);
 }
 

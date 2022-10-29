@@ -188,6 +188,10 @@ Token get_token(Lexer* lexer) {
       return new_token(lexer, TK_PLUS);
     case '-':
       return new_token(lexer, TK_MINUS);
+    case '(':
+      return new_token(lexer, TK_LBRACK);
+    case ')':
+      return new_token(lexer, TK_RBRACK);
     case '/':
       return new_token(lexer, TK_FSLASH);
     case '~':

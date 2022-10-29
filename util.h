@@ -1,6 +1,7 @@
 #ifndef EVE_UTIL_H
 #define EVE_UTIL_H
 #include "common.h"
+#include "memory.h"
 
 #define FAIL(_pre, _msg) \
   error( \
@@ -13,5 +14,6 @@
 #define ASSERT(tst, msg) (!(tst) ? FAIL("Assertion Error", (msg)) : (void)0)
 
 _Noreturn void error(char* fmt, ...);
+int copy_str(VM* vm, const char* src, char** dest, int len);
 
 #endif  //EVE_UTIL_H

@@ -1,7 +1,6 @@
 #include "compiler.h"
 
 #include "gen.h"
-#include "table.h"
 #include "vm.h"
 
 OpCode op_table[][2] = {

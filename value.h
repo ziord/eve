@@ -49,6 +49,8 @@ typedef uint64_t Value;
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
 
+#define LOAD_FACTOR (0.75)
+
 typedef struct {
   int length;
   int capacity;
@@ -64,6 +66,7 @@ typedef struct {
 typedef enum {
   OBJ_STR,
   OBJ_LIST,
+  OBJ_HMAP,
 } ObjTy;
 
 typedef struct Obj {
@@ -82,6 +85,18 @@ typedef struct {
   Obj obj;
   ArrayBuffer elems;
 } ObjList;
+
+typedef struct {
+  Value key;
+  Value value;
+} HashEntry;
+
+typedef struct {
+  Obj obj;
+  int length;
+  int capacity;
+  HashEntry* entries;
+} ObjHashMap;
 
 inline static Value num_to_val(double num) {
   return *((Value*)&(num));
@@ -102,8 +117,14 @@ char* get_value_type(Value val);
 void print_value(Value val);
 bool value_falsy(Value v);
 bool value_equal(Value a, Value b);
-uint32_t hash_string(const char* str, int len);
-uint32_t hash_value(Value v);
+Value create_string(VM* vm, ObjHashMap* table, char* str, int len);
 ObjList* create_list(VM* vm, int len);
+ObjHashMap* create_hashmap(VM* vm);
+void hashmap_init(ObjHashMap* table);
+void hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);
+Value hashmap_get(ObjHashMap* table, Value key);
+bool hashmap_remove(ObjHashMap* table, Value key);
+ObjString*
+hashmap_find_interned(ObjHashMap* table, char* str, int len, uint32_t hash);
 
 #endif  // EVE_VALUE_H

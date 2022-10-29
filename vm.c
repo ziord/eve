@@ -76,7 +76,7 @@ void init_vm(VM* vm, Code* code) {
   vm->ip = vm->code->bytes;
   vm->sp = vm->stack;
   vm->objects = NULL;
-  init_table(&vm->strings);
+  hashmap_init(&vm->strings);
 }
 
 IResult run(VM* vm) {

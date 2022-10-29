@@ -96,44 +96,13 @@ bool value_equal(Value a, Value b) {
   return a == b;
 }
 
-uint32_t hash_bits(uint64_t hash) {
-  // from Wren,
-  // adapted from http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm
-  hash = ~hash + (hash << 18);
-  hash = hash ^ (hash >> 31);
-  hash = hash * 21;
-  hash = hash ^ (hash >> 11);
-  hash = hash + (hash << 6);
-  hash = hash ^ (hash >> 22);
-  return (uint32_t)(hash & 0x3fffffff);
-}
+/*********************
+ *
+ * > Object routines
+ *
+ ********************/
 
-uint32_t hash_string(const char* str, int len) {
-  // FNV-1a hashing algorithm
-  uint32_t hash = 2166136261u;
-  uint32_t fnv_prime = 16777619u;
-  for (int i = 0; i != len; i++) {
-    hash = hash ^ (uint8_t)(str[i]);
-    hash = hash * fnv_prime;
-  }
-  return hash;
-}
-
-uint32_t hash_object(Obj* obj) {
-  switch (obj->type) {
-    case OBJ_STR:
-      return ((ObjString*)obj)->hash;
-    default:
-      UNREACHABLE("hash object");
-  }
-}
-
-uint32_t hash_value(Value v) {
-  if (IS_OBJ(v)) {
-    return hash_object(AS_OBJ(v));
-  }
-  return hash_bits(v);
-}
+static uint32_t hash_string(const char* str, int len);
 
 Obj* create_object(VM* vm, ObjTy ty, size_t size) {
   Obj* obj =
@@ -145,67 +114,9 @@ Obj* create_object(VM* vm, ObjTy ty, size_t size) {
   return obj;
 }
 
-int copy_str(VM* vm, const char* src, char** dest, int len) {
-  int i, real_len;
-  for (i = 0, real_len = 0; i < len; i++) {
-    if (src[i] != '\\') {
-      (*dest)[i] = src[i];
-    } else {
-      switch (src[i + 1]) {
-        case '\\':
-          (*dest)[i] = '\\';
-          break;
-        case '"':
-          (*dest)[i] = '"';
-          break;
-        case '\'':
-          (*dest)[i] = '\'';
-          break;
-        case 'r':
-          (*dest)[i] = '\r';
-          break;
-        case 't':
-          (*dest)[i] = '\t';
-          break;
-        case 'n':
-          (*dest)[i] = '\n';
-          break;
-        case 'f':
-          (*dest)[i] = '\f';
-          break;
-        case 'b':
-          (*dest)[i] = '\b';
-          break;
-        case 'a':
-          (*dest)[i] = '\a';
-          break;
-        default:
-          // TODO: better error handling
-          error("unknown escape sequence");
-      }
-      i++;
-    }
-    real_len++;
-  }
-  // TODO: necessary?
-  if ((len - real_len) > 5) {
-    // trim the string
-    void* tmp = realloc(*dest, i);
-    if (tmp) {
-      FREE(vm, *dest, char);
-      *dest = tmp;
-    }
-  }
-  return real_len;
-}
-
-inline static int align_to(int n, int align) {
-  return (n + align - 1) / align * align;
-}
-
-Value create_string(VM* vm, Table* table, char* str, int len) {
+Value create_string(VM* vm, ObjHashMap* table, char* str, int len) {
   uint32_t hash = hash_string(str, len);
-  ObjString* string = table_find_interned(table, str, len, hash);
+  ObjString* string = hashmap_find_interned(table, str, len, hash);
   Value val;
   if (!string) {
     string = CREATE_OBJ(vm, ObjString, OBJ_STR, sizeof(ObjString));
@@ -213,7 +124,7 @@ Value create_string(VM* vm, Table* table, char* str, int len) {
     string->str = ALLOC(vm, char, len);
     string->len = copy_str(vm, str, &string->str, len);
     val = OBJ_VAL(string);
-    table_put(table, vm, val, FALSE_VAL);
+    hashmap_put(table, vm, val, FALSE_VAL);
   } else {
     val = OBJ_VAL(string);
   }
@@ -221,7 +132,7 @@ Value create_string(VM* vm, Table* table, char* str, int len) {
 }
 
 ObjList* create_list(VM* vm, int len) {
-  int cap = GROW_CAPACITY(align_to(len, BUFFER_INIT_SIZE));
+  int cap = GROW_CAPACITY(ALIGN_TO(len, BUFFER_INIT_SIZE));
   ObjList* list = CREATE_OBJ(
       vm,
       ObjList,
@@ -230,4 +141,181 @@ ObjList* create_list(VM* vm, int len) {
   list->elems.length = len;
   list->elems.capacity = cap;
   return list;
+}
+
+ObjHashMap* create_hashmap(VM* vm) {
+  ObjHashMap* hm = CREATE_OBJ(vm, ObjHashMap, OBJ_HMAP, sizeof(ObjHashMap));
+  hashmap_init(hm);
+  return hm;
+}
+
+static uint32_t hash_bits(uint64_t hash) {
+  // from Wren,
+  // adapted from http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm
+  hash = ~hash + (hash << 18);
+  hash = hash ^ (hash >> 31);
+  hash = hash * 21;
+  hash = hash ^ (hash >> 11);
+  hash = hash + (hash << 6);
+  hash = hash ^ (hash >> 22);
+  return (uint32_t)(hash & 0x3fffffff);
+}
+
+static uint32_t hash_string(const char* str, int len) {
+  // FNV-1a hashing algorithm
+  uint32_t hash = 2166136261u;
+  uint32_t fnv_prime = 16777619u;
+  for (int i = 0; i != len; i++) {
+    hash = hash ^ (uint8_t)(str[i]);
+    hash = hash * fnv_prime;
+  }
+  return hash;
+}
+
+static uint32_t hash_object(Obj* obj) {
+  switch (obj->type) {
+    case OBJ_STR:
+      return ((ObjString*)obj)->hash;
+    default:
+      UNREACHABLE("hash object");
+  }
+}
+
+static uint32_t hash_value(Value v) {
+  if (IS_OBJ(v)) {
+    return hash_object(AS_OBJ(v));
+  }
+  return hash_bits(v);
+}
+
+static bool
+find_entry(HashEntry* entries, int capacity, HashEntry** slot, Value key) {
+  // return true if we find an entry matching key, else false
+  if (capacity == 0)
+    return false;
+  int cap = capacity - 1;
+  uint32_t start_index = hash_value(key) & capacity;
+  uint32_t index = start_index;
+  HashEntry *deleted = NULL, *entry;
+  do {
+    entry = &entries[index];
+    // insert
+    if (IS_NOTHING(entry->key)) {
+      // check if it's a fresh entry, by checking if the value is NOTHING
+      if (IS_NOTHING(entry->value)) {
+        *slot = deleted ? deleted : entry;
+        return false;
+      } else if (deleted == NULL) {
+        // -- deleted entries have values equal to NONE
+        // -- so we set 'deleted' for reuse
+        deleted = entry;
+      }
+    } else if (value_equal(entry->key, key)) {
+      *slot = entry;
+      return true;
+    }
+    index = (index + 1) & cap;
+  } while (index != start_index);
+  // at this point, the table is full of deleted entries.
+  ASSERT(deleted, "table must have at least one deleted slot");
+  *slot = deleted;
+  return false;
+}
+
+static bool
+insert_entry(HashEntry* entries, Value key, Value value, int capacity) {
+  ASSERT(capacity && entries, "entries and capacity should be non-empty");
+  HashEntry* entry;
+  if (find_entry(entries, capacity, &entry, key)) {  // update
+    entry->value = value;
+    return false;
+  } else {  // insert
+    entry->key = key;
+    entry->value = value;
+    return true;
+  }
+}
+
+static void rehash(ObjHashMap* table, VM* vm) {
+  int capacity = GROW_CAPACITY(table->capacity);
+  HashEntry* new_entries = ALLOC(vm, HashEntry, capacity);
+  for (int i = 0; i < capacity; i++) {
+    // initialize new entries
+    new_entries[i].key = NOTHING_VAL;
+    new_entries[i].value = NOTHING_VAL;
+  }
+  for (int i = 0; i < table->capacity; i++) {
+    // don't copy empty or deleted entries
+    if (IS_NOTHING(table->entries[i].key))
+      continue;
+    insert_entry(
+        new_entries,
+        table->entries[i].key,
+        table->entries[i].value,
+        table->capacity);
+  }
+  FREE(vm, table->entries, HashEntry);
+  table->entries = new_entries;
+  table->capacity = capacity;
+}
+
+void hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value) {
+  if (table->length >= table->capacity * LOAD_FACTOR) {
+    rehash(table, vm);
+  }
+  if (insert_entry(table->entries, key, value, table->capacity)) {
+    table->length++;
+  }
+}
+
+Value hashmap_get(ObjHashMap* table, Value key) {
+  HashEntry* entry;
+  if (find_entry(table->entries, table->capacity, &entry, key)) {
+    return entry->value;
+  }
+  return NOTHING_VAL;
+}
+
+bool hashmap_remove(ObjHashMap* table, Value key) {
+  HashEntry* entry;
+  if (find_entry(table->entries, table->capacity, &entry, key)) {
+    entry->key = NOTHING_VAL;
+    entry->value = NONE_VAL;  // deleted flag
+    table->length--;
+    return true;
+  }
+  return false;
+}
+
+void hashmap_init(ObjHashMap* table) {
+  table->length = table->capacity = 0;
+  table->entries = NULL;
+}
+
+ObjString* hashmap_find_interned(
+    ObjHashMap* table,
+    char* str,
+    int len,
+    uint32_t hash) {
+  if (table->capacity == 0)
+    return NULL;
+  uint32_t capacity = table->capacity - 1;
+  uint32_t index = hash & capacity;
+  HashEntry* entry;
+  for (;;) {
+    entry = &table->entries[index];
+    if (IS_NOTHING(entry->key)) {
+      // NONE value indicates deleted.
+      // We intern strings with FALSE value, i.e. key -> string, value -> False_val
+      if (IS_NONE(entry->value))
+        return NULL;
+    } else if (IS_STRING(entry->key)) {
+      ObjString* string = AS_STRING(entry->key);
+      if (string->len == len && string->hash == hash
+          && memcmp(string->str, str, len) == 0) {
+        return string;
+      }
+    }
+    index = (index + 1) & capacity;
+  }
 }

@@ -6,6 +6,7 @@
 #define BUFFER_INIT_SIZE (8)
 #define GROW_CAPACITY(cap) \
   ((cap) < BUFFER_INIT_SIZE ? BUFFER_INIT_SIZE : ((cap) << 2))
+#define ALIGN_TO(n, align) (((n) + (align)-1) / ((align) * (align)))
 
 #define GROW_BUFFER(vm, ptr, type, o_size, n_size) \
   ((type*)vm_alloc( \

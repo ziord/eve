@@ -189,7 +189,7 @@ Token get_token(Lexer* lexer) {
     case '-':
       return new_token(lexer, TK_MINUS);
     case '/':
-      return new_token(lexer, TK_F_SLASH);
+      return new_token(lexer, TK_FSLASH);
     case '~':
       return new_token(lexer, TK_TILDE);
     case '%':
@@ -201,9 +201,9 @@ Token get_token(Lexer* lexer) {
     case '=':
       return new_token(lexer, check(lexer, '=') ? TK_EQ_EQ : TK_EQ);
     case '&':
-      return new_token(lexer, check(lexer, '&') ? TK_D_AMP : TK_AMP);
+      return new_token(lexer, check(lexer, '&') ? TK_AMP_AMP : TK_AMP);
     case '|':
-      return new_token(lexer, check(lexer, '|') ? TK_D_PIPE : TK_PIPE);
+      return new_token(lexer, check(lexer, '|') ? TK_PIPE_PIPE : TK_PIPE);
     case '!':
       return new_token(lexer, check(lexer, '=') ? TK_NOT_EQ : TK_EXC_MARK);
     case '>':

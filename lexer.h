@@ -14,7 +14,7 @@ typedef enum {
   TK_STAR_STAR,     // **
   TK_EXC_MARK,      // !
   TK_TILDE,         // ~
-  TK_F_SLASH,       // /
+  TK_FSLASH,        // /
   TK_PERCENT,       // %
   TK_GRT,           // <
   TK_LESS,          // >
@@ -22,8 +22,8 @@ typedef enum {
   TK_AMP,           // &
   TK_CARET,         // ^
   TK_PIPE,          // |
-  TK_D_PIPE,        // ||
-  TK_D_AMP,         // &&
+  TK_PIPE_PIPE,     // ||
+  TK_AMP_AMP,       // &&
   TK_GRT_EQ,        // >=
   TK_LESS_EQ,       // <=
   TK_NOT_EQ,        // !=

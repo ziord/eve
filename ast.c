@@ -33,7 +33,7 @@ OpTy get_op(TokenTy ty) {
       return OP_NOT;
     case TK_TILDE:
       return OP_BW_COMPL;
-    case TK_F_SLASH:
+    case TK_FSLASH:
       return OP_DIV;
     case TK_PERCENT:
       return OP_MOD;
@@ -55,13 +55,13 @@ OpTy get_op(TokenTy ty) {
       return OP_RSHIFT;
     case TK_PIPE:
       return OP_BW_OR;
-    case TK_D_PIPE:
+    case TK_PIPE_PIPE:
       return OP_OR;
     case TK_CARET:
       return OP_BW_XOR;
     case TK_AMP:
       return OP_BW_AND;
-    case TK_D_AMP:
+    case TK_AMP_AMP:
       return OP_AND;
     default:
       return 0xff;

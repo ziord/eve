@@ -1,6 +1,8 @@
 #include "compiler.h"
 
 #include "gen.h"
+#include "table.h"
+#include "vm.h"
 
 OpCode op_table[][2] = {
     // op         unary       binary
@@ -35,6 +37,16 @@ Compiler new_compiler(AstNode* node, Code* code, VM* vm) {
 void c_num(Compiler* compiler, AstNode* node) {
   NumberNode* num = CAST(NumberNode*, node);
   emit_value(compiler, $LOAD_CONST, NUMBER_VAL(num->value), num->line);
+}
+
+void c_str(Compiler* compiler, AstNode* node) {
+  StringNode* str = CAST(StringNode*, node);
+  Value str_val = create_string(
+      compiler->vm,
+      &compiler->vm->strings,
+      str->start,
+      str->length);
+  emit_value(compiler, $LOAD_CONST, str_val, str->line);
 }
 
 void c_unit(Compiler* compiler, AstNode* node) {
@@ -107,6 +119,8 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_UNIT:
       c_unit(compiler, node);
+    case AST_STR:
+      c_str(compiler, node);
       break;
     default:
       UNREACHABLE("compile - unknown ast node");

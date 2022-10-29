@@ -33,6 +33,7 @@ static AstNode* parse_num(Parser* parser);
 static AstNode* parse_unary(Parser* parser);
 static AstNode* parse_literal(Parser* parser);
 static AstNode* parse_binary(Parser* parser, AstNode* left);
+static AstNode* parse_string(Parser* parser);
 
 // clang-format off
 ParseTable p_table[] = {
@@ -62,6 +63,7 @@ ParseTable p_table[] = {
   [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
+  [TK_STRING] = {.bp = BP_NONE, .prefix = parse_string, .infix = NULL},
   [TK_EOF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ERROR] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
 };
@@ -135,6 +137,19 @@ static AstNode* parse_num(Parser* parser) {
   }
   ASSERT(tok.value + tok.length == endptr, "failed to convert number");
   AstNode* node = new_num(&parser->store, val, line);
+  return node;
+}
+
+static AstNode* parse_string(Parser* parser) {
+  AstNode* node = new_node(&parser->store);
+  node->str = (StringNode) {
+      .type = AST_STR,
+      // skip opening quot
+      .start = ++parser->current_tk.value,
+      // exclude opening & closing quot
+      .length = parser->current_tk.length - 2,
+      .line = parser->current_tk.line};
+  advance(parser);
   return node;
 }
 

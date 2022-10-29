@@ -34,6 +34,7 @@ typedef enum {
   TK_TRUE,          // true
   TK_NONE,          // None
   TK_IDENT,         // identifier
+  TK_STRING,        // "..."
   TK_EOF,           // EOF
   TK_ERROR,         // <error>
 } TokenTy;

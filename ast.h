@@ -30,6 +30,7 @@ typedef enum {
 
 typedef enum {
   AST_NUM,
+  AST_STR,
   AST_UNIT,
   AST_UNARY,
   AST_BINARY,
@@ -42,6 +43,13 @@ typedef struct {
   int line;
   double value;
 } NumberNode;
+
+typedef struct {
+  AstTy type;
+  int line;
+  int length;
+  char* start;
+} StringNode;
 
 typedef struct {
   AstTy type;
@@ -73,6 +81,7 @@ union AstNode {
   BinaryNode binary;
   UnaryNode unary;
   UnitNode unit;
+  StringNode str;
 };
 
 typedef struct {

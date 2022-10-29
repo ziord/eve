@@ -149,6 +149,26 @@ Token lex_ident(Lexer* lexer, char ch) {
   return new_token(lexer, keyword_type(lexer, ch));
 }
 
+Token lex_string(Lexer* lexer, char start) {
+  while (!at_end(lexer)) {
+    advance(lexer);
+    if (PEEK(lexer) == '\\') {
+      // we inspect this when we "create" the string
+      advance(lexer);
+    } else if (PEEK(lexer) == start) {
+      advance(lexer);
+      if (peek(lexer, -2) != '\\') {
+        break;
+      }
+      continue;
+    }
+  }
+  if (*(lexer->current - 1) != start) {
+    return error_token(lexer, "Unclosed string");
+  }
+  return new_token(lexer, TK_STRING);
+}
+
 Token get_token(Lexer* lexer) {
   skip_whitespace(lexer);
   lexer->start = lexer->current;
@@ -162,6 +182,8 @@ Token get_token(Lexer* lexer) {
     return lex_ident(lexer, ch);
   }
   switch (ch) {
+    case '"':
+      return lex_string(lexer, ch);
     case '+':
       return new_token(lexer, TK_PLUS);
     case '-':

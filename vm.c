@@ -74,6 +74,8 @@ void init_vm(VM* vm, Code* code) {
   vm->code = code;
   vm->ip = vm->code->bytes;
   vm->sp = vm->stack;
+  vm->objects = NULL;
+  init_table(&vm->strings);
 }
 
 IResult run(VM* vm) {
@@ -145,7 +147,7 @@ IResult run(VM* vm) {
       }
       case $NOT: {
         Value v = pop_stack(vm);
-        push_stack(vm, BOOL_VAL(is_falsey_value(v)));
+        push_stack(vm, BOOL_VAL(value_falsy(v)));
         break;
       }
       case $NEGATE: {
@@ -163,13 +165,13 @@ IResult run(VM* vm) {
       case $EQ: {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
-        push_stack(vm, BOOL_VAL(value_is_equal(a, b)));
+        push_stack(vm, BOOL_VAL(value_equal(a, b)));
         break;
       }
       case $NOT_EQ: {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
-        push_stack(vm, BOOL_VAL(!value_is_equal(a, b)));
+        push_stack(vm, BOOL_VAL(!value_equal(a, b)));
         break;
       }
       case $JMP: {
@@ -179,14 +181,14 @@ IResult run(VM* vm) {
       }
       case $JMP_FALSE: {
         uint16_t offset = READ_SHORT(vm);
-        if (is_falsey_value(PEEK_STACK(vm))) {
+        if (value_falsy(PEEK_STACK(vm))) {
           vm->ip += offset;
         }
         break;
       }
       case $JMP_FALSE_OR_POP: {
         uint16_t offset = READ_SHORT(vm);
-        if (is_falsey_value(PEEK_STACK(vm))) {
+        if (value_falsy(PEEK_STACK(vm))) {
           vm->ip += offset;
         } else {
           pop_stack(vm);

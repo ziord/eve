@@ -12,7 +12,8 @@ int main() {
   // --++--2
   // 5e2 - 0x6af * 7.67 / 2 % 2 * 4 ** 3 + 2 % 4 -- 1
   // 16 | 3 * 5 & 5e2 - 0x6af * 7.67 / 2 % 2 * 4 ** 3 ^ 2 + 2 % 4 - - 1
-  Parser parser = new_parser("6 && 5 || 2");
+  // 6 && 5 || 2
+  Parser parser = new_parser("\"\tfoxy issa \' \t \nnice!\"");
   AstNode* root = parse(&parser);
   Compiler compiler = new_compiler(root, &code, &vm);
   compile(&compiler);

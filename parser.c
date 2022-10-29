@@ -36,6 +36,7 @@ static AstNode* parse_literal(Parser* parser);
 static AstNode* parse_binary(Parser* parser, AstNode* left);
 static AstNode* parse_string(Parser* parser);
 static AstNode* paren_expr(Parser* parser);
+static AstNode* list_expr(Parser* parser);
 
 // clang-format off
 ParseTable p_table[] = {
@@ -60,6 +61,8 @@ ParseTable p_table[] = {
   [TK_PIPE] = {.bp = BP_BW_OR, .prefix = NULL, .infix = parse_binary},
   [TK_LBRACK] = {.bp = BP_NONE, .prefix = paren_expr, .infix = NULL},
   [TK_RBRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_LSQ_BRACK] = {.bp = BP_NONE, .prefix = list_expr, .infix = NULL},
+  [TK_RSQ_BRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_CARET] = {.bp = BP_XOR, .prefix = NULL, .infix = parse_binary},
   [TK_AMP] = {.bp = BP_BW_AND, .prefix = NULL, .infix = parse_binary},
   [TK_LSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
@@ -153,14 +156,33 @@ static AstNode* parse_string(Parser* parser) {
       // exclude opening & closing quot
       .length = parser->current_tk.length - 2,
       .line = parser->current_tk.line};
-  advance(parser);
+  advance(parser);  // skip the string token
   return node;
 }
 
 static AstNode* paren_expr(Parser* parser) {
-  advance(parser);
+  advance(parser);  // skip '(' token
   AstNode* node = expr(parser);
   consume(parser, TK_RBRACK);
+  return node;
+}
+
+static AstNode* list_expr(Parser* parser) {
+  advance(parser);  // skip '[' token
+  AstNode* node = new_node(&parser->store);
+  ListNode* list = &node->list;
+  list->type = AST_LIST;
+  list->line = parser->previous_tk.line;
+  list->len = 0;
+  while (!match(parser, TK_RSQ_BRACK)) {
+    if (list->len > 0) {
+      consume(parser, TK_COMMA);
+    }
+    if (list->len > BYTE_MAX) {
+      parse_error(parser, parser->current_tk, E004, NULL);
+    }
+    list->elems[list->len++] = expr(parser);
+  }
   return node;
 }
 
@@ -180,7 +202,7 @@ static AstNode* parse_literal(Parser* parser) {
     default:
       UNREACHABLE("parse-literal");
   }
-  advance(parser);
+  advance(parser);  // skip literal token
   AstNode* node = new_node(&parser->store);
   node->unit = (UnitNode) {
       .type = AST_UNIT,

@@ -3,7 +3,9 @@
 #include "defs.h"
 #include "util.h"
 
-#define GROW_CAPACITY(cap) ((cap) < 8 ? 8 : ((cap) << 2))
+#define BUFFER_INIT_SIZE (8)
+#define GROW_CAPACITY(cap) \
+  ((cap) < BUFFER_INIT_SIZE ? BUFFER_INIT_SIZE : ((cap) << 2))
 
 #define GROW_BUFFER(vm, ptr, type, o_size, n_size) \
   ((type*)vm_alloc( \

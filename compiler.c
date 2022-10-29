@@ -49,6 +49,15 @@ void c_str(Compiler* compiler, AstNode* node) {
   emit_value(compiler, $LOAD_CONST, str_val, str->line);
 }
 
+void c_list(Compiler* compiler, AstNode* node) {
+  ListNode* list = CAST(ListNode*, node);
+  for (int i = 0; i < list->len; i++) {
+    c_(compiler, list->elems[i]);
+  }
+  emit_byte(compiler, $BUILD_LIST, list->line);
+  emit_byte(compiler, (byte_t)list->len, list->line);
+}
+
 void c_unit(Compiler* compiler, AstNode* node) {
   UnitNode* unit = CAST(UnitNode*, node);
   if (unit->is_bool) {
@@ -121,6 +130,9 @@ void c_(Compiler* compiler, AstNode* node) {
       c_unit(compiler, node);
     case AST_STR:
       c_str(compiler, node);
+      break;
+    case AST_LIST:
+      c_list(compiler, node);
       break;
     default:
       UNREACHABLE("compile - unknown ast node");

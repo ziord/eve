@@ -14,7 +14,8 @@ int main() {
   // 16 | 3 * 5 & 5e2 - 0x6af * 7.67 / 2 % 2 * 4 ** 3 ^ 2 + 2 % 4 - - 1
   // 6 && 5 || 2
   // "\tfoxy issa \' \t \n nice!"
-  Parser parser = new_parser("2 * (3 + 2) | 5");
+  // [1, 2, 0xff * 24, 5 * 3 -12, "fishy", [1, 2, 0xff * 24, 5 * 3 -12, "fishy"]]
+  Parser parser = new_parser("[1] == [1]");
   AstNode* root = parse(&parser);
   Compiler compiler = new_compiler(root, &code, &vm);
   compile(&compiler);

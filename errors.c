@@ -8,5 +8,6 @@ static Error errors[] = {
   [E001] = {.err_msg = "Expected token type '%s', but got '%s'", .hlp_msg = NULL},
   [E002] = {.err_msg = "Invalid token for prefix '%s'", .hlp_msg = NULL},
   [E003] = {.err_msg = "Invalid binary operator '%s'", .hlp_msg = NULL},
+  [E004] = {.err_msg = "Maximum number of elements for list exceeded. [MAX='%s']", .hlp_msg = NULL},
 };
 // clang-format on

@@ -26,6 +26,6 @@ void patch_jump(Compiler* co, int index) {
   // calc how much we need to jump
   int jmp_offset =
       co->code->length - index - 2;  // -2 to exclude the 2-byte operand
-  co->code->bytes[index++] = (jmp_offset >> 8) & 0xff;
+  co->code->bytes[index++] = jmp_offset >> 8;
   co->code->bytes[index] = jmp_offset & 0xff;
 }

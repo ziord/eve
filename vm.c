@@ -4,6 +4,7 @@
 #define READ_SHORT(vm) (vm->ip += 2, ((vm->ip[-2]) << 8u) | (vm->ip[-1]))
 #define READ_CONST(vm) (vm->code->vpool.values[READ_BYTE(vm)])
 #define PEEK_STACK(vm) (*(vm->sp - 1))
+#define PEEK_STACK_AT(vm, n) (*(vm->sp - 1 - (n)))
 #define BINARY_OP(vm, _op, _val_func) \
   { \
     Value _r = pop_stack(vm); \
@@ -193,6 +194,15 @@ IResult run(VM* vm) {
         } else {
           pop_stack(vm);
         }
+        break;
+      }
+      case $BUILD_LIST: {
+        ObjList* list = create_list(vm, READ_BYTE(vm));
+        for (int i = list->elems.length - 1, j = 0; i >= 0; i--, j++) {
+          list->elems.buffer[j] = PEEK_STACK_AT(vm, i);
+        }
+        vm->sp -= list->elems.length;
+        push_stack(vm, OBJ_VAL(list));
         break;
       }
       case $BW_XOR: {

@@ -43,6 +43,9 @@ typedef uint64_t Value;
 #define IS_STRING(val) (is_object_type(val, OBJ_STR))
 #define AS_STRING(val) ((ObjString*)(AS_OBJ(val)))
 
+#define IS_LIST(val) (is_object_type(val, OBJ_LIST))
+#define AS_LIST(val) ((ObjList*)(AS_OBJ(val)))
+
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
 
@@ -52,7 +55,16 @@ typedef struct {
   Value* values;
 } ValuePool;
 
-typedef enum { OBJ_STR } ObjTy;
+typedef struct {
+  int length;
+  int capacity;
+  Value buffer[];
+} ArrayBuffer;
+
+typedef enum {
+  OBJ_STR,
+  OBJ_LIST,
+} ObjTy;
 
 typedef struct Obj {
   ObjTy type;
@@ -65,6 +77,11 @@ typedef struct {
   int len;
   char* str;
 } ObjString;
+
+typedef struct {
+  Obj obj;
+  ArrayBuffer elems;
+} ObjList;
 
 inline static Value num_to_val(double num) {
   return *((Value*)&(num));
@@ -87,5 +104,6 @@ bool value_falsy(Value v);
 bool value_equal(Value a, Value b);
 uint32_t hash_string(const char* str, int len);
 uint32_t hash_value(Value v);
+ObjList* create_list(VM* vm, int len);
 
 #endif  // EVE_VALUE_H

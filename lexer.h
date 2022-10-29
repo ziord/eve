@@ -22,8 +22,11 @@ typedef enum {
   TK_AMP,           // &
   TK_CARET,         // ^
   TK_PIPE,          // |
+  TK_COMMA,         // ,
   TK_LBRACK,        // (
   TK_RBRACK,        // )
+  TK_LSQ_BRACK,     // [
+  TK_RSQ_BRACK,     // ]
   TK_PIPE_PIPE,     // ||
   TK_AMP_AMP,       // &&
   TK_GRT_EQ,        // >=

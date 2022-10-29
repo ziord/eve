@@ -184,6 +184,8 @@ Token get_token(Lexer* lexer) {
   switch (ch) {
     case '"':
       return lex_string(lexer, ch);
+    case ',':
+      return new_token(lexer, TK_COMMA);
     case '+':
       return new_token(lexer, TK_PLUS);
     case '-':
@@ -192,6 +194,10 @@ Token get_token(Lexer* lexer) {
       return new_token(lexer, TK_LBRACK);
     case ')':
       return new_token(lexer, TK_RBRACK);
+    case '[':
+      return new_token(lexer, TK_LSQ_BRACK);
+    case ']':
+      return new_token(lexer, TK_RSQ_BRACK);
     case '/':
       return new_token(lexer, TK_FSLASH);
     case '~':

@@ -5,6 +5,11 @@ int plain_instruction(char* inst, int offset) {
   return ++offset;
 }
 
+int byte_instruction(char* inst, Code* code, int offset) {
+  printf("%-16s\t%3d\n", inst, code->bytes[offset + 1]);
+  return offset + 2;
+}
+
 int constant_instruction(char* inst, Code* code, int offset) {
   // inst, operand, (value).
   int operand = code->bytes[++offset];
@@ -86,6 +91,8 @@ int dis_instruction(Code* code, int index) {
       return plain_instruction("$RET", index);
     case $LOAD_CONST:
       return constant_instruction("$LOAD_CONST", code, index);
+    case $BUILD_LIST:
+      return byte_instruction("$BUILD_LIST", code, index);
     default:
       return plain_instruction("UNKNOWN_OPCODE", index);
   }

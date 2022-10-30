@@ -31,6 +31,7 @@ typedef enum {
   TK_RCURLY,        // }
   TK_HASH,          // #
   TK_COLON,         // :
+  TK_SEMI_COLON,    // ;
   TK_PIPE_PIPE,     // ||
   TK_AMP_AMP,       // &&
   TK_GRT_EQ,        // >=
@@ -42,6 +43,7 @@ typedef enum {
   TK_FALSE,         // false
   TK_TRUE,          // true
   TK_NONE,          // None
+  TK_SHOW,          // show
   TK_IDENT,         // identifier
   TK_STRING,        // "..."
   TK_EOF,           // EOF

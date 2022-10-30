@@ -36,6 +36,8 @@ typedef enum {
   AST_UNIT,
   AST_UNARY,
   AST_BINARY,
+  AST_EXPR_STMT,
+  AST_SHOW_STMT,
 } AstTy;
 
 typedef union AstNode AstNode;
@@ -92,6 +94,19 @@ typedef struct {
   int line;
 } UnitNode;
 
+typedef struct {
+  AstTy type;
+  int line;
+  AstNode* expr;
+} ExprStmtNode;
+
+typedef struct {
+  AstTy type;
+  int line;
+  int length;
+  AstNode* items[BYTE_MAX];
+} ShowStmtNode;
+
 union AstNode {
   NumberNode num;
   BinaryNode binary;
@@ -100,6 +115,8 @@ union AstNode {
   StringNode str;
   ListNode list;
   MapNode map;
+  ExprStmtNode expr_stmt;
+  ShowStmtNode show_stmt;
 };
 
 typedef struct {

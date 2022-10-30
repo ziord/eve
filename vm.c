@@ -93,9 +93,6 @@ IResult run(VM* vm) {
         break;
       }
       case $RET: {
-        printf("\n");
-        print_value(pop_stack(vm));
-        printf("\n");
         return RESULT_SUCCESS;
       }
       case $ADD: {
@@ -173,6 +170,22 @@ IResult run(VM* vm) {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
         push_stack(vm, BOOL_VAL(!value_equal(a, b)));
+        break;
+      }
+      case $POP: {
+        pop_stack(vm);
+        break;
+      }
+      case $DISPLAY: {
+        byte_t len = READ_BYTE(vm);
+        for (int i = 0; i < len; i++) {
+          print_value(PEEK_STACK_AT(vm, i));
+          if (i < len - 1) {
+            printf(" ");
+          }
+        }
+        printf("\n");
+        vm->sp -= len;
         break;
       }
       case $JMP: {

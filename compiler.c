@@ -125,6 +125,19 @@ void c_binary(Compiler* compiler, AstNode* node) {
   }
 }
 
+void c_expr_stmt(Compiler* compiler, AstNode* node) {
+  c_(compiler, node->expr_stmt.expr);
+  emit_byte(compiler, $POP, node->expr_stmt.line);
+}
+
+void c_show_stmt(Compiler* compiler, AstNode* node) {
+  for (int i = node->show_stmt.length - 1; i >= 0; i--) {
+    c_(compiler, node->show_stmt.items[i]);
+  }
+  emit_byte(compiler, $DISPLAY, node->show_stmt.line);
+  emit_byte(compiler, (byte_t)node->show_stmt.length, node->show_stmt.line);
+}
+
 void c_(Compiler* compiler, AstNode* node) {
   AstTy ty = *((AstTy*)node);
   switch (ty) {
@@ -148,6 +161,12 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_MAP:
       c_map(compiler, node);
+      break;
+    case AST_EXPR_STMT:
+      c_expr_stmt(compiler, node);
+      break;
+    case AST_SHOW_STMT:
+      c_show_stmt(compiler, node);
       break;
     default:
       UNREACHABLE("compile - unknown ast node");

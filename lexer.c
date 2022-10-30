@@ -131,6 +131,10 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
     case 'N':
       return expect(lexer, "one", 1, 3, TK_NONE);
     case 's':
+      switch (*(lexer->start + 1)) {
+        case 'h':
+          return expect(lexer, "ow", 2, 2, TK_SHOW);
+      }
     case 'w':
     case 'r':
     case 'i':
@@ -186,6 +190,8 @@ Token get_token(Lexer* lexer) {
       return lex_string(lexer, ch);
     case ',':
       return new_token(lexer, TK_COMMA);
+    case ';':
+      return new_token(lexer, TK_SEMI_COLON);
     case '+':
       return new_token(lexer, TK_PLUS);
     case '-':

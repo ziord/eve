@@ -270,9 +270,47 @@ static AstNode* expr(Parser* parser) {
   return _parse(parser, BP_ASSIGNMENT);
 }
 
+static AstNode* parse_expr_stmt(Parser* parser) {
+  int line = parser->current_tk.line;
+  AstNode* exp = expr(parser);
+  consume(parser, TK_SEMI_COLON);
+  AstNode* stmt = new_node(&parser->store);
+  ExprStmtNode* expr_stmt = &stmt->expr_stmt;
+  expr_stmt->type = AST_EXPR_STMT;
+  expr_stmt->line = line;
+  expr_stmt->expr = exp;
+  return stmt;
+}
+
+static AstNode* parse_show_stmt(Parser* parser) {
+  advance(parser);  // skip token 'show'
+  AstNode* stmt = new_node(&parser->store);
+  ShowStmtNode* show_stmt = &stmt->show_stmt;
+  show_stmt->line = parser->previous_tk.line;
+  show_stmt->type = AST_SHOW_STMT;
+  show_stmt->length = 0;
+  do {
+    if (show_stmt->length > BYTE_MAX) {
+      parse_error(parser, parser->current_tk, E007, NULL);
+    }
+    if (show_stmt->length > 0) {
+      consume(parser, TK_COMMA);
+    }
+    show_stmt->items[show_stmt->length++] = expr(parser);
+  } while (!match(parser, TK_SEMI_COLON));
+  return stmt;
+}
+
+static AstNode* parse_stmt(Parser* parser) {
+  if (is_tty(parser, TK_SHOW)) {
+    return parse_show_stmt(parser);
+  }
+  return parse_expr_stmt(parser);
+}
+
 AstNode* parse(Parser* parser) {
   advance(parser);
-  AstNode* node = expr(parser);
+  AstNode* node = parse_stmt(parser);
   consume(parser, TK_EOF);
   return node;
 }

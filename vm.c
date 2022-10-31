@@ -13,6 +13,7 @@
       push_stack(vm, _val_func(AS_NUMBER(_l) _op AS_NUMBER(_r))); \
     } else { \
       return runtime_error( \
+          vm, \
           "%s: %s and %s", \
           "Unsupported operand types for " \
           "'" #_op "'", \
@@ -23,6 +24,7 @@
 #define BINARY_CHECK(vm, _op, _a, _b, check) \
   if (!check((_a)) || !check((_b))) { \
     return runtime_error( \
+        vm, \
         "%s: %s and %s", \
         "Unsupported operand types for " \
         "'" #_op "'", \
@@ -32,6 +34,7 @@
 #define UNARY_CHECK(vm, _op, _a, check) \
   if (!check((_a))) { \
     return runtime_error( \
+        vm, \
         "%s: %s and %s", \
         "Unsupported operand type for " \
         "'" #_op "'", \
@@ -57,15 +60,6 @@ inline static void print_stack(VM* vm) {
   printf("\n");
 }
 
-static IResult runtime_error(char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  fputs("Runtime Error: ", stderr);
-  vfprintf(stderr, fmt, ap);
-  va_end(ap);
-  return RESULT_RUNTIME_ERROR;
-}
-
 VM new_vm() {
   VM vm = {.code = NULL, .ip = NULL, .sp = NULL};
   return vm;
@@ -77,6 +71,83 @@ void init_vm(VM* vm, Code* code) {
   vm->sp = vm->stack;
   vm->objects = NULL;
   hashmap_init(&vm->strings);
+}
+
+static IResult runtime_error(VM* vm, char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  fputs("Runtime Error: ", stderr);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  return RESULT_RUNTIME_ERROR;
+}
+
+inline static bool validate_subscript(
+    VM* vm,
+    Value subscript,
+    int max,
+    char* type,
+    int64_t* validated) {
+  if (!IS_NUMBER(subscript)) {
+    runtime_error(
+        vm,
+        "%s subscript must be an integer, not %s",
+        type,
+        get_value_type(subscript));
+    return false;
+  }
+  double index = AS_NUMBER(subscript);
+  if (index < 0) {
+    index += max;
+  }
+  if (index > max || index < 0) {  // < 0 if len is 0
+    runtime_error(vm, "%s index not in range", type);
+    return false;
+  } else if ((index != (int64_t)index)) {
+    runtime_error(vm, "%s subscript must be an integer", type);
+    return false;
+  }
+  *validated = (int64_t)index;
+  return true;
+}
+
+static bool perform_subscript(VM* vm, Value val, Value subscript) {
+  if (IS_LIST(val)) {
+    ObjList* list = AS_LIST(val);
+    int64_t index;
+    if (validate_subscript(
+            vm,
+            subscript,
+            list->elems.length,
+            "list",
+            &index)) {
+      push_stack(vm, list->elems.buffer[index]);
+      return true;
+    }
+  } else if (IS_HMAP(val)) {
+    Value res = hashmap_get(AS_MAP(val), subscript);
+    if (res != NOTHING_VAL) {
+      push_stack(vm, res);
+      return true;
+    } else {
+      runtime_error(vm, "hashmap has no such key");
+    }
+  } else if (IS_STRING(val)) {
+    ObjString* str = AS_STRING(val);
+    int64_t index;
+    if (validate_subscript(vm, subscript, str->len, "string", &index)) {
+      ObjString* new_str =
+          create_string(vm, &vm->strings, &str->str[index], 1);
+      push_stack(vm, OBJ_VAL(new_str));
+      return true;
+    }
+  } else {
+    runtime_error(
+        vm,
+        "'%s' type is not subscriptable",
+        get_value_type(val));
+  }
+  return false;
 }
 
 IResult run(VM* vm) {
@@ -174,6 +245,14 @@ IResult run(VM* vm) {
       }
       case $POP: {
         pop_stack(vm);
+        break;
+      }
+      case $SUBSCRIPT: {
+        Value subscript = pop_stack(vm);
+        Value val = pop_stack(vm);
+        if (!perform_subscript(vm, val, subscript)) {
+          return RESULT_RUNTIME_ERROR;
+        }
         break;
       }
       case $DISPLAY: {

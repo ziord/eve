@@ -17,7 +17,8 @@ int main() {
   // [1, 2, 0xff * 24, 5 * 3 -12, "fishy", [1, 2, 0xff * 24, 5 * 3 -12, "fishy"]]
   // [#{"name": "jon", 5: 0xffff, 888: 5}, #{1: 5}]
   // show #{true: None, None: false, false: None}, 2 / 4 * 0xff, ["yo!"];
-  Parser parser = new_parser("show 55;");
+  // show #{"ball": 0xb, 2: "b", 3: "c", "dog": [1, 2, 3, #{"a": "apple", "b": "bag"}, "crab"]}["dog"][-2]["a"][2];
+  Parser parser = new_parser("show #{1: [1, 2]}[1][-1];");
   AstNode* root = parse(&parser);
   Compiler compiler = new_compiler(root, &code, &vm);
   compile(&compiler);

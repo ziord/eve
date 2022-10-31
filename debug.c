@@ -85,6 +85,8 @@ int dis_instruction(Code* code, int index) {
       return plain_instruction("$RET", index);
     case $POP:
       return plain_instruction("$POP", index);
+    case $SUBSCRIPT:
+      return plain_instruction("$SUBSCRIPT", index);
     case $JMP:
       return jump_instruction("$JMP", code, index, 1);
     case $JMP_FALSE:

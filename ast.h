@@ -36,6 +36,7 @@ typedef enum {
   AST_UNIT,
   AST_UNARY,
   AST_BINARY,
+  AST_SUBSCRIPT,
   AST_EXPR_STMT,
   AST_SHOW_STMT,
 } AstTy;
@@ -98,6 +99,13 @@ typedef struct {
   AstTy type;
   int line;
   AstNode* expr;
+  AstNode* subscript;
+} SubscriptNode;
+
+typedef struct {
+  AstTy type;
+  int line;
+  AstNode* expr;
 } ExprStmtNode;
 
 typedef struct {
@@ -117,6 +125,7 @@ union AstNode {
   MapNode map;
   ExprStmtNode expr_stmt;
   ShowStmtNode show_stmt;
+  SubscriptNode subscript;
 };
 
 typedef struct {

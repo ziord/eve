@@ -125,6 +125,12 @@ void c_binary(Compiler* compiler, AstNode* node) {
   }
 }
 
+void c_subscript(Compiler* compiler, AstNode* node) {
+  c_(compiler, node->subscript.expr);
+  c_(compiler, node->subscript.subscript);
+  emit_byte(compiler, $SUBSCRIPT, node->subscript.line);
+}
+
 void c_expr_stmt(Compiler* compiler, AstNode* node) {
   c_(compiler, node->expr_stmt.expr);
   emit_byte(compiler, $POP, node->expr_stmt.line);
@@ -161,6 +167,9 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_MAP:
       c_map(compiler, node);
+      break;
+    case AST_SUBSCRIPT:
+      c_subscript(compiler, node);
       break;
     case AST_EXPR_STMT:
       c_expr_stmt(compiler, node);

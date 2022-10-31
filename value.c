@@ -146,8 +146,9 @@ Value create_string(VM* vm, ObjHashMap* table, char* str, int len) {
   if (!string) {
     string = CREATE_OBJ(vm, ObjString, OBJ_STR, sizeof(ObjString));
     string->hash = hash;
-    string->str = ALLOC(vm, char, len);
+    string->str = ALLOC(vm, char, len + 1);
     string->len = copy_str(vm, str, &string->str, len);
+    string->str[string->len] = '\0';
     val = OBJ_VAL(string);
     hashmap_put(table, vm, val, FALSE_VAL);
   } else {

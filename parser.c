@@ -19,6 +19,7 @@ typedef enum BindingPower {
   BP_FACTOR,      // /, *, %
   BP_POWER,       // **
   BP_UNARY,       // !, -, +, ~
+  BP_ACCESS,      // [], .
 } BindingPower;
 // clang-format on
 
@@ -29,7 +30,7 @@ typedef struct {
 } ParseTable;
 
 static AstNode* _parse(Parser* parser, BindingPower bp);
-static AstNode* expr(Parser* parser);
+static AstNode* parse_expr(Parser* parser);
 static AstNode* parse_num(Parser* parser);
 static AstNode* parse_unary(Parser* parser);
 static AstNode* parse_literal(Parser* parser);
@@ -38,6 +39,7 @@ static AstNode* parse_string(Parser* parser);
 static AstNode* parse_grouping(Parser* parser);
 static AstNode* parse_list(Parser* parser);
 static AstNode* parse_map(Parser* parser);
+static AstNode* parse_subscript(Parser* parser, AstNode* left);
 
 // clang-format off
 ParseTable p_table[] = {
@@ -62,7 +64,7 @@ ParseTable p_table[] = {
   [TK_PIPE] = {.bp = BP_BW_OR, .prefix = NULL, .infix = parse_binary},
   [TK_LBRACK] = {.bp = BP_NONE, .prefix = parse_grouping, .infix = NULL},
   [TK_RBRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
-  [TK_LSQ_BRACK] = {.bp = BP_NONE, .prefix = parse_list, .infix = NULL},
+  [TK_LSQ_BRACK] = {.bp = BP_ACCESS, .prefix = parse_list, .infix = parse_subscript},
   [TK_RSQ_BRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_HASH] = {.bp = BP_NONE, .prefix = parse_map, .infix = NULL},
   [TK_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -168,7 +170,7 @@ static AstNode* parse_string(Parser* parser) {
 
 static AstNode* parse_grouping(Parser* parser) {
   advance(parser);  // skip '(' token
-  AstNode* node = expr(parser);
+  AstNode* node = parse_expr(parser);
   consume(parser, TK_RBRACK);
   return node;
 }
@@ -187,7 +189,7 @@ static AstNode* parse_list(Parser* parser) {
     if (list->len > BYTE_MAX) {
       parse_error(parser, parser->current_tk, E004, NULL);
     }
-    list->elems[list->len++] = expr(parser);
+    list->elems[list->len++] = parse_expr(parser);
   }
   return node;
 }
@@ -210,9 +212,9 @@ static AstNode* parse_map(Parser* parser) {
     if (map->length > 0) {
       consume(parser, TK_COMMA);
     }
-    key = expr(parser);
+    key = parse_expr(parser);
     consume(parser, TK_COLON);
-    value = expr(parser);
+    value = parse_expr(parser);
     map->items[map->length][0] = key;
     map->items[map->length++][1] = value;
   }
@@ -266,13 +268,27 @@ static AstNode* parse_binary(Parser* parser, AstNode* left) {
   return new_binary(&parser->store, left, right, line, op);
 }
 
-static AstNode* expr(Parser* parser) {
+static AstNode* parse_subscript(Parser* parser, AstNode* left) {
+  int line = parser->current_tk.line;
+  advance(parser);  // skip '[' token
+  AstNode* expr = parse_expr(parser);
+  consume(parser, TK_RSQ_BRACK);
+  AstNode* node = new_node(&parser->store);
+  SubscriptNode* subscript = &node->subscript;
+  subscript->type = AST_SUBSCRIPT;
+  subscript->line = line;
+  subscript->expr = left;
+  subscript->subscript = expr;
+  return node;
+}
+
+static AstNode* parse_expr(Parser* parser) {
   return _parse(parser, BP_ASSIGNMENT);
 }
 
 static AstNode* parse_expr_stmt(Parser* parser) {
   int line = parser->current_tk.line;
-  AstNode* exp = expr(parser);
+  AstNode* exp = parse_expr(parser);
   consume(parser, TK_SEMI_COLON);
   AstNode* stmt = new_node(&parser->store);
   ExprStmtNode* expr_stmt = &stmt->expr_stmt;
@@ -296,7 +312,7 @@ static AstNode* parse_show_stmt(Parser* parser) {
     if (show_stmt->length > 0) {
       consume(parser, TK_COMMA);
     }
-    show_stmt->items[show_stmt->length++] = expr(parser);
+    show_stmt->items[show_stmt->length++] = parse_expr(parser);
   } while (!match(parser, TK_SEMI_COLON));
   return stmt;
 }

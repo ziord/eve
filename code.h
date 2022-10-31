@@ -37,6 +37,7 @@ typedef enum {
   $BUILD_MAP,
   $POP,
   $DISPLAY,
+  $SUBSCRIPT,
   $RET
 } OpCode;
 typedef struct {

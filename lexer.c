@@ -155,7 +155,6 @@ Token lex_ident(Lexer* lexer, char ch) {
 
 Token lex_string(Lexer* lexer, char start) {
   while (!at_end(lexer)) {
-    advance(lexer);
     if (PEEK(lexer) == '\\') {
       // we inspect this when we "create" the string
       advance(lexer);
@@ -164,8 +163,8 @@ Token lex_string(Lexer* lexer, char start) {
       if (peek(lexer, -2) != '\\') {
         break;
       }
-      continue;
     }
+    advance(lexer);
   }
   if (*(lexer->current - 1) != start) {
     return error_token(lexer, "Unclosed string");

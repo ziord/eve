@@ -1,0 +1,21 @@
+#include "vec.h"
+
+void vec_init(Vec* vec) {
+  vec->cap = vec->len = 0;
+  vec->items = NULL;
+}
+
+void vec_push(Vec* vec, void* item) {
+  if (vec->len >= vec->cap) {
+    vec->cap = GROW_CAPACITY(vec->cap);
+    vec->items = alloc(vec->items, vec->cap);
+  }
+  vec->items[vec->len++] = item;
+}
+
+void vec_free(Vec* vec) {
+  if (!vec->cap)
+    return;
+  free(vec->items);
+  vec_init(vec);
+}

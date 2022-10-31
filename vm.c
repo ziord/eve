@@ -136,9 +136,8 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
     ObjString* str = AS_STRING(val);
     int64_t index;
     if (validate_subscript(vm, subscript, str->len, "string", &index)) {
-      ObjString* new_str =
-          create_string(vm, &vm->strings, &str->str[index], 1);
-      push_stack(vm, OBJ_VAL(new_str));
+      Value new_str = create_string(vm, &vm->strings, &str->str[index], 1);
+      push_stack(vm, new_str);
       return true;
     }
   } else {

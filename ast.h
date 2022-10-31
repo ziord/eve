@@ -3,6 +3,7 @@
 
 #include "lexer.h"
 #include "memory.h"
+#include "vec.h"
 
 typedef enum {
   OP_PLUS,
@@ -39,6 +40,7 @@ typedef enum {
   AST_SUBSCRIPT,
   AST_EXPR_STMT,
   AST_SHOW_STMT,
+  AST_PROGRAM,
 } AstTy;
 
 typedef union AstNode AstNode;
@@ -115,6 +117,11 @@ typedef struct {
   AstNode* items[BYTE_MAX];
 } ShowStmtNode;
 
+typedef struct {
+  AstTy type;
+  Vec decls;
+} ProgramNode;
+
 union AstNode {
   NumberNode num;
   BinaryNode binary;
@@ -126,6 +133,7 @@ union AstNode {
   ExprStmtNode expr_stmt;
   ShowStmtNode show_stmt;
   SubscriptNode subscript;
+  ProgramNode program;
 };
 
 typedef struct {

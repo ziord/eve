@@ -144,6 +144,13 @@ void c_show_stmt(Compiler* compiler, AstNode* node) {
   emit_byte(compiler, (byte_t)node->show_stmt.length, node->show_stmt.line);
 }
 
+void c_program(Compiler* compiler, AstNode* node) {
+  ProgramNode* program = CAST(ProgramNode*, node);
+  for (int i = 0; i < program->decls.len; i++) {
+    c_(compiler, program->decls.items[i]);
+  }
+}
+
 void c_(Compiler* compiler, AstNode* node) {
   AstTy ty = *((AstTy*)node);
   switch (ty) {
@@ -176,6 +183,9 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_SHOW_STMT:
       c_show_stmt(compiler, node);
+      break;
+    case AST_PROGRAM:
+      c_program(compiler, node);
       break;
     default:
       UNREACHABLE("compile - unknown ast node");

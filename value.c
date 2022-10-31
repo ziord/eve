@@ -191,7 +191,7 @@ static uint32_t hash_string(const char* str, int len) {
   // FNV-1a hashing algorithm
   uint32_t hash = 2166136261u;
   uint32_t fnv_prime = 16777619u;
-  for (int i = 0; i != len; i++) {
+  for (int i = 0; i < len; i++) {
     hash = hash ^ (uint8_t)(str[i]);
     hash = hash * fnv_prime;
   }

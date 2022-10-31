@@ -70,7 +70,6 @@ ParseTable p_table[] = {
   [TK_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_RCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
-  [TK_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_CARET] = {.bp = BP_XOR, .prefix = NULL, .infix = parse_binary},
   [TK_AMP] = {.bp = BP_BW_AND, .prefix = NULL, .infix = parse_binary},
   [TK_LSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
@@ -324,9 +323,23 @@ static AstNode* parse_stmt(Parser* parser) {
   return parse_expr_stmt(parser);
 }
 
+static AstNode* parse_decls(Parser* parser) {
+  return parse_stmt(parser);
+}
+
+static AstNode* parse_program(Parser* parser) {
+  AstNode* node = new_node(&parser->store);
+  node->program.type = AST_PROGRAM;
+  vec_init(&node->program.decls);
+  while (!match(parser, TK_EOF)) {
+    vec_push(&node->program.decls, parse_decls(parser));
+  }
+  return node;
+}
+
 AstNode* parse(Parser* parser) {
   advance(parser);
-  AstNode* node = parse_stmt(parser);
+  AstNode* node = parse_program(parser);
   consume(parser, TK_EOF);
   return node;
 }

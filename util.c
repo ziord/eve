@@ -10,7 +10,7 @@ _Noreturn void error(char* fmt, ...) {
   exit(EXIT_FAILURE);
 }
 
-int copy_str(VM* vm, const char* src, char** dest, int len) {
+int copy_str(const char* src, char** dest, int len) {
   int i, real_len;
   for (i = 0, real_len = 0; i < len; i++) {
     if (src[i] != '\\') {
@@ -52,6 +52,11 @@ int copy_str(VM* vm, const char* src, char** dest, int len) {
     }
     real_len++;
   }
+  return real_len;
+}
+
+int copy_str_compact(VM* vm, const char* src, char** dest, int len) {
+  int real_len = copy_str(src, dest, len);
   if ((len - real_len) >= BUFFER_INIT_SIZE) {
     // trim the string
     *dest = GROW_BUFFER(vm, *dest, char, len, real_len);

@@ -119,7 +119,12 @@ char* get_value_type(Value val);
 void print_value(Value val);
 bool value_falsy(Value v);
 bool value_equal(Value a, Value b);
-Value create_string(VM* vm, ObjHashMap* table, char* str, int len);
+Value create_string(
+    VM* vm,
+    ObjHashMap* table,
+    char* str,
+    int len,
+    bool is_alloc);
 ObjList* create_list(VM* vm, int len);
 ObjHashMap* create_hashmap(VM* vm);
 void hashmap_init(ObjHashMap* table);

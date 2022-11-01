@@ -8,7 +8,7 @@ void vec_init(Vec* vec) {
 void vec_push(Vec* vec, void* item) {
   if (vec->len >= vec->cap) {
     vec->cap = GROW_CAPACITY(vec->cap);
-    vec->items = alloc(vec->items, vec->cap);
+    vec->items = alloc(vec->items, vec->cap * sizeof(*vec->items));
   }
   vec->items[vec->len++] = item;
 }

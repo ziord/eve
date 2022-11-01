@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "errors.h"
 
 // clang-format off
 typedef enum {
@@ -51,8 +52,10 @@ typedef enum {
 } TokenTy;
 // clang-format on
 
-typedef struct {
+typedef struct Token {
   TokenTy ty;
+  ErrorTy error_ty;
+  bool has_esc;
   int line;
   int length;
   int column;
@@ -60,12 +63,14 @@ typedef struct {
 } Token;
 
 typedef struct {
+  bool at_error;
   int column;
   int line;
   char *src, *start, *current;
 } Lexer;
 
 void init_lexer(Lexer* lexer, char* src);
+char* get_src_at_line(Lexer* lexer, Token token, int* padding, int* len);
 Token get_token(Lexer* lexer);
 
 #endif  //EVE_LEXER_H

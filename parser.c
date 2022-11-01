@@ -1,7 +1,14 @@
 #include "parser.h"
 
+#define BUFFER_SIZE (BUFFER_INIT_SIZE << 4)
+#define CREATE_BUFFER(_buff, ...) \
+  char _buff[BUFFER_SIZE]; \
+  snprintf(_buff, BUFFER_SIZE, __VA_ARGS__);
+
 typedef AstNode* (*PrefixFn)(Parser*);
 typedef AstNode* (*InfixFn)(Parser*, AstNode*);
+extern Error error_types[];
+extern char* token_types[];
 
 // clang-format off
 typedef enum BindingPower {
@@ -40,6 +47,7 @@ static AstNode* parse_grouping(Parser* parser);
 static AstNode* parse_list(Parser* parser);
 static AstNode* parse_map(Parser* parser);
 static AstNode* parse_subscript(Parser* parser, AstNode* left);
+static AstNode* parse_stmt(Parser* parser);
 
 // clang-format off
 ParseTable p_table[] = {
@@ -62,12 +70,14 @@ ParseTable p_table[] = {
   [TK_PIPE_PIPE] = {.bp = BP_OR, .prefix = NULL, .infix = parse_binary},
   [TK_AMP_AMP] = {.bp = BP_AND, .prefix = NULL, .infix = parse_binary},
   [TK_PIPE] = {.bp = BP_BW_OR, .prefix = NULL, .infix = parse_binary},
+  [TK_COMMA] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LBRACK] = {.bp = BP_NONE, .prefix = parse_grouping, .infix = NULL},
   [TK_RBRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LSQ_BRACK] = {.bp = BP_ACCESS, .prefix = parse_list, .infix = parse_subscript},
   [TK_RSQ_BRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_HASH] = {.bp = BP_NONE, .prefix = parse_map, .infix = NULL},
   [TK_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_SEMI_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_RCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_CARET] = {.bp = BP_XOR, .prefix = NULL, .infix = parse_binary},
@@ -77,29 +87,107 @@ ParseTable p_table[] = {
   [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
+  [TK_SHOW] = {.bp = BP_NONE, .prefix = parse_stmt, .infix = NULL},
   [TK_STRING] = {.bp = BP_NONE, .prefix = parse_string, .infix = NULL},
   [TK_EOF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ERROR] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
 };
 // clang-format on
 
-Parser new_parser(char* src) {
+typedef struct {
+  char* err_msg;
+  char* hlp_msg;
+  bool is_warning;
+  Token* token;
+} ErrorArgs;
+
+static void advance(Parser* parser);
+
+Parser new_parser(char* src, char* fp) {
   Lexer lexer;
   init_lexer(&lexer, src);
-  Parser parser = {.lexer = lexer};
+  Parser parser = {.lexer = lexer, .file_path = fp};
   init_store(&parser.store);
   return parser;
 }
 
-void parse_error(Parser* parser, Token tok, ErrorTy ty, char* msg) {
-  error("Parse error: %s", tok.value);
+void free_parser(Parser* parser) {
+  free_store(&parser->store);
+}
+
+ErrorArgs new_error_arg(Token* token, char* err, char* hlp) {
+  return (ErrorArgs) {
+      .token = token,
+      .err_msg = err,
+      .hlp_msg = hlp,
+      .is_warning = false};
+}
+
+void display_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
+  /*
+   * optional_args:
+   *  - is_warning
+   *  - token
+   *  - help_msg
+   *  - err_msg
+   */
+#define base_len 15
+  bool is_warning = args ? args->is_warning : false;
+  Error error = error_types[ty];
+  char* warning_msg = is_warning ? "[Warning] " : " ";
+  Token token = args ? (args->token ? *args->token : parser->current_tk)
+                     : parser->current_tk;
+  char* help_msg = args ? (args->hlp_msg ? args->hlp_msg : error.hlp_msg)
+                        : error.hlp_msg;
+  char* err_msg = args ? (args->err_msg ? args->err_msg : error.err_msg)
+                       : error.err_msg;
+  parser->file_path ? fprintf(stderr, "~ %s ~\n", parser->file_path)
+                    : (void)0;
+  fprintf(
+      stderr,
+      "%4d |[E%04d]%s%s\n",
+      token.line,
+      ty,
+      warning_msg,
+      err_msg);
+  int squi_padding, src_len;
+  char* src =
+      get_src_at_line(&parser->lexer, token, &squi_padding, &src_len);
+  squi_padding = abs(squi_padding) > base_len
+      ? (src_len > base_len ? base_len : src_len)
+      : abs(squi_padding);
+  int squi_len =
+      token.length <= 0 || token.length > base_len ? 1 : token.length;
+  fprintf(stderr, "%6s %.*s\n", "|", src_len, src);
+  fprintf(stderr, "%6s ", "|");
+  for (int i = 0; i < squi_padding; i++)
+    fputc(' ', stderr);
+  for (int i = 0; i < squi_len; i++)
+    fputc('^', stderr);
+  fputs("\n", stderr);
+  if (help_msg) {
+    fprintf(stderr, "%6s Help:\n", "|");
+    fprintf(stderr, "%6s %s\n", "|", help_msg);
+  }
+#undef base_len
+}
+
+void parse_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
+  //  error("Parse error: %s", tok.value);
+  //  capture_error(parser, ty, false, true, true, msg, NULL);
+  display_error(parser, ty, args);
+  if (args && !args->is_warning) {
+    // TOOD: cleanup before exit
+    exit(EXIT_FAILURE);
+  }
 }
 
 void advance(Parser* parser) {
   parser->previous_tk = parser->current_tk;
   Token tok = get_token(&parser->lexer);
   if (tok.ty == TK_ERROR) {
-    parse_error(parser, tok, E000, tok.value);
+    ErrorArgs args = new_error_arg(&tok, NULL, NULL);
+    parse_error(parser, tok.error_ty, &args);
   } else {
     parser->current_tk = tok;
   }
@@ -109,7 +197,13 @@ void consume(Parser* parser, TokenTy ty) {
   if (parser->current_tk.ty == ty) {
     advance(parser);
   } else {
-    parse_error(parser, parser->current_tk, E001, NULL);
+    CREATE_BUFFER(
+        buff,
+        error_types[E0004].hlp_msg,
+        token_types[ty],
+        token_types[parser->current_tk.ty])
+    ErrorArgs args = new_error_arg(NULL, NULL, buff);
+    parse_error(parser, E0004, &args);
   }
 }
 
@@ -128,7 +222,13 @@ bool match(Parser* parser, TokenTy ty) {
 static AstNode* _parse(Parser* parser, BindingPower bp) {
   PrefixFn pref = p_table[parser->current_tk.ty].prefix;
   if (pref == NULL) {
-    parse_error(parser, parser->current_tk, E002, NULL);
+    CREATE_BUFFER(
+        buff,
+        error_types[E0005].err_msg,
+        token_types[parser->current_tk.ty])
+    ErrorArgs args = new_error_arg(NULL, buff, NULL);
+    parse_error(parser, E0005, &args);
+    return NULL;
   }
   AstNode* node = pref(parser);
   while (bp < p_table[parser->current_tk.ty].bp) {
@@ -154,14 +254,42 @@ static AstNode* parse_num(Parser* parser) {
   return node;
 }
 
+inline static int count_escapes(char* src, int len) {
+  char* p = strchr(src, '\\');
+  int count = 0;
+  while (p != NULL) {
+    if (p - src >= len) {
+      break;
+    }
+    count++;
+    p = strchr(p + 1, '\\');
+  }
+  return count;
+}
+
 static AstNode* parse_string(Parser* parser) {
   AstNode* node = new_node(&parser->store);
+  Token tok = parser->current_tk;
+  char* src = tok.value + 1;  // skip opening quot
+  int len = tok.length - 2;  // exclude opening & closing quot
+  char* str;
+  if (tok.has_esc) {
+    size_t real_len = len - count_escapes(src, len);
+    str = alloc(NULL, real_len + 1);
+    ASSERT(
+        copy_str(src, &str, len) == real_len,
+        "invalid escape computation");
+    str[real_len] = '\0';
+    // update len and copy
+    len = real_len;
+  } else {
+    str = src;
+  }
   node->str = (StringNode) {
       .type = AST_STR,
-      // skip opening quot
-      .start = ++parser->current_tk.value,
-      // exclude opening & closing quot
-      .length = parser->current_tk.length - 2,
+      .start = str,
+      .length = len,
+      .is_alloc = tok.has_esc,
       .line = parser->current_tk.line};
   advance(parser);  // skip the string token
   return node;
@@ -186,7 +314,10 @@ static AstNode* parse_list(Parser* parser) {
       consume(parser, TK_COMMA);
     }
     if (list->len > BYTE_MAX) {
-      parse_error(parser, parser->current_tk, E004, NULL);
+      CREATE_BUFFER(buff, error_types[E0007].hlp_msg, BYTE_MAX)
+      ErrorArgs args = new_error_arg(NULL, NULL, buff);
+      parse_error(parser, E0007, &args);
+      return node;
     }
     list->elems[list->len++] = parse_expr(parser);
   }
@@ -206,7 +337,10 @@ static AstNode* parse_map(Parser* parser) {
   AstNode *value, *key;
   while (!match(parser, TK_RCURLY)) {
     if (map->length > BYTE_MAX) {
-      parse_error(parser, parser->current_tk, E006, NULL);
+      CREATE_BUFFER(buff, error_types[E0009].hlp_msg, BYTE_MAX)
+      ErrorArgs args = new_error_arg(NULL, NULL, buff);
+      parse_error(parser, E0009, &args);
+      return node;
     }
     if (map->length > 0) {
       consume(parser, TK_COMMA);
@@ -306,7 +440,10 @@ static AstNode* parse_show_stmt(Parser* parser) {
   show_stmt->length = 0;
   do {
     if (show_stmt->length > BYTE_MAX) {
-      parse_error(parser, parser->current_tk, E007, NULL);
+      CREATE_BUFFER(buff, error_types[E0010].hlp_msg, BYTE_MAX)
+      ErrorArgs args = new_error_arg(NULL, NULL, buff);
+      parse_error(parser, E0010, &args);
+      return stmt;
     }
     if (show_stmt->length > 0) {
       consume(parser, TK_COMMA);
@@ -343,3 +480,5 @@ AstNode* parse(Parser* parser) {
   consume(parser, TK_EOF);
   return node;
 }
+
+#undef CREATE_BUFFER

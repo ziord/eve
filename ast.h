@@ -30,7 +30,7 @@ typedef enum {
 } OpTy;
 
 typedef enum {
-  AST_NUM,
+  AST_NUM = 1,
   AST_STR,
   AST_LIST,
   AST_MAP,
@@ -53,6 +53,7 @@ typedef struct {
 
 typedef struct {
   AstTy type;
+  bool is_alloc;
   int line;
   int length;
   char* start;

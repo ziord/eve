@@ -1,2 +1,19 @@
-show "testing!";
+## this is a comment
+#*
+this is a multiline
+comment section.
+*#
+
+show (5e2 - 0x6af * 7.67 / 2 | 2 * 4 ** 3 | 2 % 4 -- 1) == -5933;
+show (-- ++ - -2) == 2;
+show (5e2 - 0x6af * 7.67 / 2 % 2 * 4 ** 3 + 2 % 4 - - 1) == 395.1600000000326;
+show (16 | 3 * 5 & 5e2 - 0x6af * 7.67 / 2 % 2 * 4 ** 3 ^ 2 + 2 % 4 - - 1) == 29;
+show (6 && 5 || 2) == 5;
+show "\tfoxy issa \' \t \n nice!" == "\tfoxy issa \' \t \n nice!";
+show [1, 2, 0xff * 24, 5 * 3 -12, "fishy", [1, 2, 0xff * 24, 5 * 3 -12, "fishy"]];
+show [#{"name": "jon", 5: 0xffff, 888: 5}, #{1: 5}];
+show #{true: None, None: false, false: None}, 2 / 4 * 0xff, ["yo!"];
+show #{"ball": 0xb, 2: "b", 3: "c", "dog": [1, 2, 3, #{"a": "apple", "b": "bag"}, "crab"]}["dog"][-2]["a"][2];
 show "foo\t\t\t\t\t\b\t\t\t\t\t\thappy", #{"a": "fox"}, [4, 5, 6];
+show "OK.";
+###{[]: 0xff, 5: 10, "fox": "fish"};

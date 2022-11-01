@@ -7,6 +7,10 @@ void init_store(NodeStore* store) {
 
 void free_store(NodeStore* store) {
   for (int i = 0; i < store->length; i++) {
+    // cleanup all uses of vec
+    if (store->nodes[i]->num.type == AST_PROGRAM) {
+      vec_free(&store->nodes[i]->program.decls);
+    }
     free(store->nodes[i]);
   }
 }

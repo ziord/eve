@@ -35,10 +35,10 @@
   if (!check((_a))) { \
     return runtime_error( \
         vm, \
-        "%s: %s and %s", \
+        "%s: %s", \
         "Unsupported operand type for " \
         "'" #_op "'", \
-        get_value_type(_a)); \
+        get_value_type((_a))); \
   }
 
 inline static Value pop_stack(VM* vm) {
@@ -70,6 +70,7 @@ void init_vm(VM* vm, Code* code) {
   vm->ip = vm->code->bytes;
   vm->sp = vm->stack;
   vm->objects = NULL;
+  vm->bytes_alloc = 0;
   hashmap_init(&vm->strings);
 }
 
@@ -136,7 +137,8 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
     ObjString* str = AS_STRING(val);
     int64_t index;
     if (validate_subscript(vm, subscript, str->len, "string", &index)) {
-      Value new_str = create_string(vm, &vm->strings, &str->str[index], 1);
+      Value new_str =
+          create_string(vm, &vm->strings, &str->str[index], 1, false);
       push_stack(vm, new_str);
       return true;
     }
@@ -254,7 +256,7 @@ IResult run(VM* vm) {
         }
         break;
       }
-      case $DISPLAY: {
+      case $DISPLAY: {  // TODO: remove
         byte_t len = READ_BYTE(vm);
         for (int i = 0; i < len; i++) {
           print_value(PEEK_STACK_AT(vm, i));
@@ -363,5 +365,10 @@ IResult run(VM* vm) {
 }
 
 #undef READ_BYTE
+#undef READ_SHORT
 #undef READ_CONST
+#undef PEEK_STACK
+#undef PEEK_STACK_AT
 #undef BINARY_OP
+#undef BINARY_CHECK
+#undef UNARY_CHECK

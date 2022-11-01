@@ -139,20 +139,37 @@ Obj* create_object(VM* vm, ObjTy ty, size_t size) {
   return obj;
 }
 
-Value create_string(VM* vm, ObjHashMap* table, char* str, int len) {
+Value create_string(
+    VM* vm,
+    ObjHashMap* table,
+    char* str,
+    int len,
+    bool is_alloc) {
   uint32_t hash = hash_string(str, len);
   ObjString* string = hashmap_find_interned(table, str, len, hash);
   Value val;
   if (!string) {
     string = CREATE_OBJ(vm, ObjString, OBJ_STR, sizeof(ObjString));
     string->hash = hash;
-    string->str = ALLOC(vm, char, len + 1);
-    string->len = copy_str(vm, str, &string->str, len);
-    string->str[string->len] = '\0';
+    if (!is_alloc) {
+      string->str = ALLOC(vm, char, len + 1);
+      string->len = copy_str_compact(vm, str, &string->str, len);
+      string->str[string->len] = '\0';
+    } else {
+      string->str = str;
+      string->len = len;
+      // track the already allocated bytes
+      vm->bytes_alloc += len;
+    }
     val = OBJ_VAL(string);
     hashmap_put(table, vm, val, FALSE_VAL);
   } else {
     val = OBJ_VAL(string);
+    if (is_alloc) {
+      // cleanup, since we already have the
+      // allocated string (and it's tracked)
+      free(str);
+    }
   }
   return val;
 }

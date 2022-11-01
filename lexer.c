@@ -2,26 +2,52 @@
 
 #define PEEK(_lex) peek((_lex), 0)
 static inline char get_char(Lexer* lexer);
+char* token_types[] = {
+    [TK_NUM] = "<number>",    [TK_PLUS] = "+",
+    [TK_MINUS] = "-",         [TK_STAR] = "*",
+    [TK_STAR_STAR] = "**",    [TK_EXC_MARK] = "!",
+    [TK_TILDE] = "~",         [TK_FSLASH] = "/",
+    [TK_PERCENT] = "%",       [TK_GRT] = ">",
+    [TK_LESS] = "<",          [TK_EQ] = "=",
+    [TK_AMP] = "&",           [TK_CARET] = "^",
+    [TK_PIPE] = "|",          [TK_COMMA] = ",",
+    [TK_LBRACK] = "(",        [TK_RBRACK] = ")",
+    [TK_LSQ_BRACK] = "[",     [TK_RSQ_BRACK] = "]",
+    [TK_LCURLY] = "{",        [TK_RCURLY] = "}",
+    [TK_HASH] = "#",          [TK_COLON] = ":",
+    [TK_SEMI_COLON] = ";",    [TK_PIPE_PIPE] = "||",
+    [TK_AMP_AMP] = "&&",      [TK_GRT_EQ] = ">=",
+    [TK_LESS_EQ] = "<=",      [TK_NOT_EQ] = "!=",
+    [TK_EQ_EQ] = "==",        [TK_LSHIFT] = ">>",
+    [TK_RSHIFT] = "<<",       [TK_FALSE] = "false",
+    [TK_TRUE] = "true",       [TK_NONE] = "None",
+    [TK_SHOW] = "show",       [TK_IDENT] = "<identifier>",
+    [TK_STRING] = "<string>", [TK_EOF] = "<eof>",
+    [TK_ERROR] = "<error>",
+};
 
 void init_lexer(Lexer* lexer, char* src) {
   lexer->src = src;
   lexer->column = lexer->line = 1;
   lexer->start = lexer->current = src;
+  lexer->at_error = false;
 }
 
 Token new_token(Lexer* lexer, TokenTy type) {
   Token token = {
       .ty = type,
+      .has_esc = false,
       .line = lexer->line,
       .column = lexer->column,
       .value = lexer->start,
+      .error_ty = E000,
       .length = (int)(lexer->current - lexer->start)};
   return token;
 }
 
-Token error_token(Lexer* lexer, char* msg) {
+Token error_token(Lexer* lexer, ErrorTy ty) {
   Token tok = new_token(lexer, TK_ERROR);
-  tok.value = msg;
+  tok.error_ty = ty;
   return tok;
 }
 
@@ -73,6 +99,51 @@ expect(Lexer* lexer, char* rem, int start, int rest, TokenTy ty) {
   return TK_IDENT;
 }
 
+char* get_src_at_line(Lexer* lexer, Token token, int* padding, int* len) {
+  char* start = lexer->src;
+  int line = 1;
+  while (line != lexer->line) {
+    start++;
+    if (*start == '\n') {
+      line++;
+    }
+  }
+  start++;
+  char* end = start;
+  while (*end != '\n') {
+    if (*end == '\0')
+      break;
+    end++;
+  }
+  *padding = token.column - token.length - 1;
+  *len = end - start;
+  return start;
+}
+
+void skip_line_comment(Lexer* lexer) {
+  while (PEEK(lexer) != '\n') {
+    if (at_end(lexer))
+      return;
+    advance(lexer);
+  }
+  advance(lexer);
+}
+
+void skip_multiline_comment(Lexer* lexer) {
+  advance(lexer);  // skip '*'
+  while (!at_end(lexer)) {
+    if (PEEK(lexer) == '*' && peek(lexer, 1) == '#') {
+      advance(lexer);  // skip '*'
+      advance(lexer);  // skip '#'
+      return;
+    }
+    advance(lexer);
+  }
+  if (at_end(lexer)) {
+    lexer->at_error = true;
+  }
+}
+
 void skip_whitespace(Lexer* lexer) {
   for (;;) {
     switch (PEEK(lexer)) {
@@ -82,6 +153,14 @@ void skip_whitespace(Lexer* lexer) {
       case '\n':
         advance(lexer);
         break;
+      case '#':
+        if (peek(lexer, 1) == '#') {
+          skip_line_comment(lexer);
+          break;
+        } else if (peek(lexer, 1) == '*') {
+          skip_multiline_comment(lexer);
+          break;
+        }
       default:
         return;
     }
@@ -154,10 +233,12 @@ Token lex_ident(Lexer* lexer, char ch) {
 }
 
 Token lex_string(Lexer* lexer, char start) {
+  bool has_esc = false;
   while (!at_end(lexer)) {
     if (PEEK(lexer) == '\\') {
       // we inspect this when we "create" the string
       advance(lexer);
+      has_esc = true;
     } else if (PEEK(lexer) == start) {
       advance(lexer);
       if (peek(lexer, -2) != '\\') {
@@ -167,15 +248,20 @@ Token lex_string(Lexer* lexer, char start) {
     advance(lexer);
   }
   if (*(lexer->current - 1) != start) {
-    return error_token(lexer, "Unclosed string");
+    return error_token(lexer, E0001);
   }
-  return new_token(lexer, TK_STRING);
+  Token tok = new_token(lexer, TK_STRING);
+  tok.has_esc = has_esc;
+  return tok;
 }
 
 Token get_token(Lexer* lexer) {
   skip_whitespace(lexer);
   lexer->start = lexer->current;
-  if (at_end(lexer)) {
+  if (lexer->at_error) {
+    // will only be reached if comment isn't closed.
+    return error_token(lexer, E0002);
+  } else if (at_end(lexer)) {
     return new_token(lexer, TK_EOF);
   }
   char ch = get_char(lexer);
@@ -242,6 +328,6 @@ Token get_token(Lexer* lexer) {
               : check(lexer, '=') ? TK_LESS_EQ
                                   : TK_LESS);
     default:
-      return error_token(lexer, "unknown token type");
+      return error_token(lexer, E0003);
   }
 }

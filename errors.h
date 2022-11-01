@@ -2,14 +2,17 @@
 #define EVE_ERRORS_H
 
 typedef enum {
-  E000,  // covers all lex error
-  E001,
-  E002,
-  E003,
-  E004,
-  E005,
-  E006,
-  E007,
+  E000,  // no error
+  E0001,
+  E0002,
+  E0003,
+  E0004,
+  E0005,
+  E0006,
+  E0007,
+  E0008,
+  E0009,
+  E0010,
 } ErrorTy;
 
 typedef struct {

@@ -20,6 +20,7 @@ typedef struct VM {
   Value stack[STACK_MAX];
   Value* sp;
   Obj* objects;
+  size_t bytes_alloc;
   ObjHashMap strings;
 } VM;
 

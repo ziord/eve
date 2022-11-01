@@ -44,7 +44,8 @@ void c_str(Compiler* compiler, AstNode* node) {
       compiler->vm,
       &compiler->vm->strings,
       str->start,
-      str->length);
+      str->length,
+      str->is_alloc);
   emit_value(compiler, $LOAD_CONST, str_val, str->line);
 }
 

@@ -1,0 +1,13 @@
+## this is a line comment
+#*
+this is a multiline
+comment section.
+*#
+#*
+* this is a beautiful comment
+*
+# * hallelujah!
+*
+*#
+###{[]: 0xff, 5: 10, "fox": "fish"};
+show "OK.";

@@ -9,6 +9,7 @@ typedef AstNode* (*PrefixFn)(Parser*);
 typedef AstNode* (*InfixFn)(Parser*, AstNode*);
 extern Error error_types[];
 extern char* token_types[];
+extern AstNode* error_node;
 
 // clang-format off
 typedef enum BindingPower {
@@ -107,16 +108,21 @@ typedef struct {
 
 static void advance(Parser* parser);
 
-Parser new_parser(char* src, char* fp) {
+Parser new_parser(char* src, const char* fp) {
   Lexer lexer;
   init_lexer(&lexer, src);
-  Parser parser = {.lexer = lexer, .file_path = fp};
+  Parser parser =
+      {.lexer = lexer, .file_path = fp, .errors = 0, .panicking = false};
   init_store(&parser.store);
   return parser;
 }
 
 void free_parser(Parser* parser) {
   free_store(&parser->store);
+}
+
+inline static AstNode* new_node(Parser* parser) {
+  return new_ast_node(&parser->store);
 }
 
 ErrorArgs new_error_arg(Token* token, char* err, char* hlp) {
@@ -135,7 +141,6 @@ void display_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
    *  - help_msg
    *  - err_msg
    */
-#define base_len 15
   bool is_warning = args ? args->is_warning : false;
   Error error = error_types[ty];
   char* warning_msg = is_warning ? "[Warning] " : " ";
@@ -157,11 +162,8 @@ void display_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
   int squi_padding, src_len;
   char* src =
       get_src_at_line(&parser->lexer, token, &squi_padding, &src_len);
-  squi_padding = abs(squi_padding) > base_len
-      ? (src_len > base_len ? base_len : src_len)
-      : abs(squi_padding);
-  int squi_len =
-      token.length <= 0 || token.length > base_len ? 1 : token.length;
+  squi_padding = abs(squi_padding);
+  int squi_len = token.length <= 0 ? 1 : token.length;
   fprintf(stderr, "%6s %.*s\n", "|", src_len, src);
   fprintf(stderr, "%6s ", "|");
   for (int i = 0; i < squi_padding; i++)
@@ -173,17 +175,19 @@ void display_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
     fprintf(stderr, "%6s Help:\n", "|");
     fprintf(stderr, "%6s %s\n", "|", help_msg);
   }
-#undef base_len
 }
 
-void parse_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
-  //  error("Parse error: %s", tok.value);
-  //  capture_error(parser, ty, false, true, true, msg, NULL);
-  display_error(parser, ty, args);
-  if (args && !args->is_warning) {
-    // TOOD: cleanup before exit
-    exit(EXIT_FAILURE);
+AstNode* parse_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
+  //  parser->at_error = true;
+  if (!parser->panicking) {
+    parser->errors++;
+    parser->panicking = true;
+    if (parser->errors > 1) {
+      fputc('\n', stderr);
+    }
+    display_error(parser, ty, args);
   }
+  return error_node;
 }
 
 void advance(Parser* parser) {
@@ -231,8 +235,7 @@ static AstNode* _parse(Parser* parser, BindingPower bp) {
         error_types[E0005].err_msg,
         token_types[parser->current_tk.ty])
     ErrorArgs args = new_error_arg(NULL, buff, NULL);
-    parse_error(parser, E0005, &args);
-    return NULL;
+    return parse_error(parser, E0005, &args);
   }
   AstNode* node = pref(parser);
   while (bp < p_table[parser->current_tk.ty].bp) {
@@ -272,13 +275,13 @@ inline static int count_escapes(char* src, int len) {
 }
 
 static AstNode* parse_string(Parser* parser) {
-  AstNode* node = new_node(&parser->store);
+  AstNode* node = new_node(parser);
   Token tok = parser->current_tk;
   char* src = tok.value + 1;  // skip opening quot
   int len = tok.length - 2;  // exclude opening & closing quot
   char* str;
   if (tok.has_esc) {
-    size_t real_len = len - count_escapes(src, len);
+    int real_len = len - count_escapes(src, len);
     str = alloc(NULL, real_len + 1);
     ASSERT(
         copy_str(src, &str, len) == real_len,
@@ -308,7 +311,7 @@ static AstNode* parse_grouping(Parser* parser) {
 
 static AstNode* parse_list(Parser* parser) {
   advance(parser);  // skip '[' token
-  AstNode* node = new_node(&parser->store);
+  AstNode* node = new_node(parser);
   ListNode* list = &node->list;
   list->type = AST_LIST;
   list->line = parser->previous_tk.line;
@@ -320,8 +323,7 @@ static AstNode* parse_list(Parser* parser) {
     if (list->len > BYTE_MAX) {
       CREATE_BUFFER(buff, error_types[E0007].hlp_msg, BYTE_MAX)
       ErrorArgs args = new_error_arg(NULL, NULL, buff);
-      parse_error(parser, E0007, &args);
-      return node;
+      return parse_error(parser, E0007, &args);
     }
     list->elems[list->len++] = parse_expr(parser);
   }
@@ -333,7 +335,7 @@ static AstNode* parse_map(Parser* parser) {
   int line = parser->current_tk.line;
   advance(parser);  // skip '#' token
   consume(parser, TK_LCURLY);
-  AstNode* node = new_node(&parser->store);
+  AstNode* node = new_node(parser);
   MapNode* map = &node->map;
   map->line = line;
   map->length = 0;
@@ -343,8 +345,7 @@ static AstNode* parse_map(Parser* parser) {
     if (map->length > BYTE_MAX) {
       CREATE_BUFFER(buff, error_types[E0009].hlp_msg, BYTE_MAX)
       ErrorArgs args = new_error_arg(NULL, NULL, buff);
-      parse_error(parser, E0009, &args);
-      return node;
+      return parse_error(parser, E0009, &args);
     }
     if (map->length > 0) {
       consume(parser, TK_COMMA);
@@ -375,7 +376,7 @@ static AstNode* parse_literal(Parser* parser) {
       UNREACHABLE("parse-literal");
   }
   advance(parser);  // skip literal token
-  AstNode* node = new_node(&parser->store);
+  AstNode* node = new_node(parser);
   node->unit = (UnitNode) {
       .type = AST_UNIT,
       .line = line,
@@ -410,7 +411,7 @@ static AstNode* parse_subscript(Parser* parser, AstNode* left) {
   advance(parser);  // skip '[' token
   AstNode* expr = parse_expr(parser);
   consume(parser, TK_RSQ_BRACK);
-  AstNode* node = new_node(&parser->store);
+  AstNode* node = new_node(parser);
   SubscriptNode* subscript = &node->subscript;
   subscript->type = AST_SUBSCRIPT;
   subscript->line = line;
@@ -427,7 +428,7 @@ static AstNode* parse_expr_stmt(Parser* parser) {
   int line = parser->current_tk.line;
   AstNode* exp = parse_expr(parser);
   consume(parser, TK_SEMI_COLON);
-  AstNode* stmt = new_node(&parser->store);
+  AstNode* stmt = new_node(parser);
   ExprStmtNode* expr_stmt = &stmt->expr_stmt;
   expr_stmt->type = AST_EXPR_STMT;
   expr_stmt->line = line;
@@ -437,7 +438,7 @@ static AstNode* parse_expr_stmt(Parser* parser) {
 
 static AstNode* parse_show_stmt(Parser* parser) {
   advance(parser);  // skip token 'show'
-  AstNode* stmt = new_node(&parser->store);
+  AstNode* stmt = new_node(parser);
   ShowStmtNode* show_stmt = &stmt->show_stmt;
   show_stmt->line = parser->previous_tk.line;
   show_stmt->type = AST_SHOW_STMT;
@@ -446,8 +447,7 @@ static AstNode* parse_show_stmt(Parser* parser) {
     if (show_stmt->length > BYTE_MAX) {
       CREATE_BUFFER(buff, error_types[E0010].hlp_msg, BYTE_MAX)
       ErrorArgs args = new_error_arg(NULL, NULL, buff);
-      parse_error(parser, E0010, &args);
-      return stmt;
+      return parse_error(parser, E0010, &args);
     }
     if (show_stmt->length > 0) {
       consume(parser, TK_COMMA);
@@ -467,7 +467,7 @@ static AstNode* parse_stmt(Parser* parser) {
 static AstNode* parse_var_decl(Parser* parser) {
   // let foo = expr;
   int line = parser->current_tk.line;
-  AstNode* var = new_node(&parser->store);
+  AstNode* var = new_node(parser);
   advance(parser);
   consume(parser, TK_IDENT);
   var->var = (VarNode) {
@@ -477,7 +477,7 @@ static AstNode* parse_var_decl(Parser* parser) {
       .line = line};
   consume(parser, TK_EQ);
   AstNode* value = parse_expr(parser);
-  AstNode* decl = new_node(&parser->store);
+  AstNode* decl = new_node(parser);
   decl->binary = (BinaryNode) {
       .type = AST_VAR_DECL,
       .line = line,
@@ -491,13 +491,30 @@ static AstNode* parse_var_decl(Parser* parser) {
 static AstNode* parse_var(Parser* parser) {
   advance(parser);
   Token tok = parser->previous_tk;
-  AstNode* node = new_node(&parser->store);
+  AstNode* node = new_node(parser);
   node->var = (VarNode) {
       .line = tok.line,
       .len = tok.length,
       .name = tok.value,
       .type = AST_VAR};
   return node;
+}
+
+void resync(Parser* parser) {
+  parser->panicking = false;
+  for (;;) {
+    if (parser->previous_tk.ty == TK_SEMI_COLON) {
+      return;
+    }
+    switch (parser->current_tk.ty) {
+      case TK_LET:
+      case TK_SHOW:
+      case TK_EOF:
+        return;
+      default:
+        advance(parser);
+    }
+  }
 }
 
 static AstNode* parse_decls(Parser* parser) {
@@ -508,10 +525,18 @@ static AstNode* parse_decls(Parser* parser) {
 }
 
 static AstNode* parse_program(Parser* parser) {
-  AstNode* node = new_node(&parser->store);
+  AstNode* node = new_node(parser);
   node->program.type = AST_PROGRAM;
   vec_init(&node->program.decls);
   while (!match(parser, TK_EOF)) {
+    if (parser->panicking) {
+      resync(parser);
+      // just in case we hit eof after re-syncing,
+      // we should immediately end parsing
+      if (is_tty(parser, TK_EOF)) {
+        break;
+      }
+    }
     vec_push(&node->program.decls, parse_decls(parser));
   }
   return node;

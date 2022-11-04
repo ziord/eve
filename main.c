@@ -12,6 +12,10 @@ int execute(char* fp) {
   char* src = read_file(fp);
   Parser parser = new_parser(src, fp);
   AstNode* root = parse(&parser);
+  if (parser.errors) {
+    free_parser(&parser);
+    return RESULT_COMPILE_ERROR;
+  }
   // compile
   Compiler compiler = new_compiler(root, &code, &vm);
   compile(&compiler);
@@ -19,11 +23,11 @@ int execute(char* fp) {
   free_parser(&parser);
   // run
   init_vm(&vm, &code);
-  run(&vm);
+  IResult ret = run(&vm);
   // destruct
   free_code(&code, &vm);
   free(src);
-  return 0;
+  return ret;
 }
 
 int show_options() {

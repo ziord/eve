@@ -1,26 +1,26 @@
 #include "ast.h"
 
+AstNode __node = (AstNode) {
+    .num = (NumberNode) {.type = AST_ERROR, .line = -1, .value = 0}};
+AstNode* error_node = &__node;
+
 void init_store(NodeStore* store) {
   store->capacity = store->length = 0;
-  store->nodes = NULL;
+  vec_init(&store->nodes);
 }
 
 void free_store(NodeStore* store) {
-  for (int i = 0; i < store->length; i++) {
+  AstNode* node;
+  for (int i = 0; i < store->nodes.len; i++) {
     // cleanup all uses of vec
-    if (store->nodes[i]->num.type == AST_PROGRAM) {
-      vec_free(&store->nodes[i]->program.decls);
+    node = (AstNode*)(store->nodes.items[i]);
+    if ((node)->num.type == AST_PROGRAM) {
+      vec_free(&(node)->program.decls);
     }
-    free(store->nodes[i]);
+    if (node->num.type != AST_ERROR) {
+      free(node);
+    }
   }
-}
-
-void save_node(NodeStore* store, AstNode* node) {
-  if (store->length >= store->capacity) {
-    store->capacity = GROW_CAPACITY(store->capacity);
-    store->nodes = alloc(store->nodes, sizeof(AstNode*) * store->capacity);
-  }
-  store->nodes[store->length++] = node;
 }
 
 OpTy get_op(TokenTy ty) {
@@ -74,14 +74,14 @@ OpTy get_op(TokenTy ty) {
   }
 }
 
-AstNode* new_node(NodeStore* store) {
+AstNode* new_ast_node(NodeStore* store) {
   AstNode* node = alloc(NULL, sizeof(AstNode));
-  save_node(store, node);
+  vec_push(&store->nodes, node);
   return node;
 }
 
 AstNode* new_num(NodeStore* store, double val, int line) {
-  AstNode* node = new_node(store);
+  AstNode* node = new_ast_node(store);
   node->num = (NumberNode) {.value = val, .type = AST_NUM, .line = line};
   return node;
 }
@@ -92,7 +92,7 @@ AstNode* new_binary(
     AstNode* right,
     int line,
     OpTy op) {
-  AstNode* node = new_node(store);
+  AstNode* node = new_ast_node(store);
   BinaryNode* binary = CAST(BinaryNode*, node);
   binary->type = AST_BINARY;
   binary->l_node = left;
@@ -103,7 +103,7 @@ AstNode* new_binary(
 }
 
 AstNode* new_unary(NodeStore* store, AstNode* node, int line, OpTy op) {
-  AstNode* ast_node = new_node(store);
+  AstNode* ast_node = new_ast_node(store);
   UnaryNode* unary = CAST(UnaryNode*, ast_node);
   unary->type = AST_UNARY;
   unary->node = node;

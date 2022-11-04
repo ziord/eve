@@ -46,6 +46,7 @@ Token new_token(Lexer* lexer, TokenTy type) {
 }
 
 Token error_token(Lexer* lexer, ErrorTy ty) {
+  lexer->at_error = false;
   Token tok = new_token(lexer, TK_ERROR);
   tok.error_ty = ty;
   return tok;

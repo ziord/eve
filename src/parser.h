@@ -10,11 +10,13 @@ typedef struct {
   Token current_tk;
   Token previous_tk;
   Lexer lexer;
-  char* file_path;
+  bool panicking;
+  int errors;
+  const char* file_path;
   NodeStore store;
 } Parser;
 
-Parser new_parser(char* src, char* fp);
+Parser new_parser(char* src, const char* fp);
 void free_parser(Parser* parser);
 AstNode* parse(Parser* parser);
 

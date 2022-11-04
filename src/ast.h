@@ -37,6 +37,7 @@ typedef enum {
   AST_MAP,
   AST_UNIT,
   AST_VAR,
+  AST_ERROR,
   AST_UNARY,
   AST_BINARY,
   AST_SUBSCRIPT,
@@ -151,13 +152,13 @@ union AstNode {
 typedef struct {
   int length;
   int capacity;
-  AstNode** nodes;
+  Vec nodes;
 } NodeStore;
 
 void init_store(NodeStore* store);
 void free_store(NodeStore* store);
 OpTy get_op(TokenTy ty);
-AstNode* new_node(NodeStore* store);
+AstNode* new_ast_node(NodeStore* store);
 AstNode* new_num(NodeStore* store, double val, int line);
 AstNode* new_unary(NodeStore* store, AstNode* node, int line, OpTy op);
 AstNode* new_binary(

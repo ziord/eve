@@ -9,9 +9,9 @@
 #define STACK_MAX 0xfff
 
 typedef enum {
-  RESULT_SUCCESS,  // successful run
+  RESULT_SUCCESS = 0,  // successful run
+  RESULT_COMPILE_ERROR,  // parse/compile error
   RESULT_RUNTIME_ERROR,  // runtime error
-  RESULT_COMPILE_ERROR,  // runtime error
 } IResult;
 
 typedef struct VM {

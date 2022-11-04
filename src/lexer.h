@@ -45,6 +45,7 @@ typedef enum {
   TK_TRUE,          // true
   TK_NONE,          // None
   TK_SHOW,          // show
+  TK_LET,           // let
   TK_IDENT,         // identifier
   TK_STRING,        // "..."
   TK_EOF,           // EOF

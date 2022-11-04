@@ -93,14 +93,18 @@ int dis_instruction(Code* code, int index) {
       return jump_instruction("$JMP_FALSE", code, index, 1);
     case $JMP_FALSE_OR_POP:
       return jump_instruction("$JMP_FALSE_OR_POP", code, index, 1);
-    case $LOAD_CONST:
-      return constant_instruction("$LOAD_CONST", code, index);
     case $BUILD_LIST:
       return byte_instruction("$BUILD_LIST", code, index);
     case $BUILD_MAP:
       return byte_instruction("$BUILD_MAP", code, index);
     case $DISPLAY:
       return byte_instruction("$DISPLAY", code, index);
+    case $LOAD_CONST:
+      return constant_instruction("$LOAD_CONST", code, index);
+    case $DEFINE_GLOBAL:
+      return constant_instruction("$DEFINE_GLOBAL", code, index);
+    case $GET_GLOBAL:
+      return constant_instruction("$GET_GLOBAL", code, index);
     default:
       return plain_instruction("UNKNOWN_OPCODE", index);
   }

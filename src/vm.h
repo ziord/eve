@@ -22,6 +22,7 @@ typedef struct VM {
   Obj* objects;
   size_t bytes_alloc;
   ObjHashMap strings;
+  ObjHashMap globals;
 } VM;
 
 VM new_vm();

@@ -53,6 +53,8 @@ OpTy get_op(TokenTy ty) {
       return OP_NOT_EQ;
     case TK_EQ_EQ:
       return OP_LOG_EQ;
+    case TK_EQ:
+      return OP_EQ;
     case TK_LSHIFT:
       return OP_LSHIFT;
     case TK_RSHIFT:

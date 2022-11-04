@@ -72,6 +72,7 @@ void init_vm(VM* vm, Code* code) {
   vm->objects = NULL;
   vm->bytes_alloc = 0;
   hashmap_init(&vm->strings);
+  hashmap_init(&vm->globals);
 }
 
 static IResult runtime_error(VM* vm, char* fmt, ...) {
@@ -162,6 +163,24 @@ IResult run(VM* vm) {
     switch (inst) {
       case $LOAD_CONST: {
         push_stack(vm, READ_CONST(vm));
+        break;
+      }
+      case $DEFINE_GLOBAL: {
+        Value var = READ_CONST(vm);
+        hashmap_put(&vm->globals, vm, var, pop_stack(vm));
+        break;
+      }
+      case $GET_GLOBAL: {
+        Value var = READ_CONST(vm);
+        Value val;
+        if ((val = hashmap_get(&vm->globals, var)) != NOTHING_VAL) {
+          push_stack(vm, val);
+        } else {
+          return runtime_error(
+              vm,
+              "Name '%s' is not defined",
+              AS_STRING(var)->str);
+        }
         break;
       }
       case $RET: {

@@ -1,0 +1,6 @@
+let x = 5;
+let y = #{x: x ** 2, "facts": "this is a pilot"};
+show x, y;
+## list
+let z = [x, y];
+show z;

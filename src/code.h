@@ -38,6 +38,8 @@ typedef enum {
   $POP,
   $DISPLAY,
   $SUBSCRIPT,
+  $DEFINE_GLOBAL,
+  $GET_GLOBAL,
   $RET
 } OpCode;
 typedef struct {

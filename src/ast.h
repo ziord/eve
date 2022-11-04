@@ -12,6 +12,7 @@ typedef enum {
   OP_DIV,
   OP_POW,
   OP_MOD,
+  OP_EQ,
   OP_LESS,
   OP_LESS_EQ,
   OP_GRT,
@@ -35,11 +36,13 @@ typedef enum {
   AST_LIST,
   AST_MAP,
   AST_UNIT,
+  AST_VAR,
   AST_UNARY,
   AST_BINARY,
   AST_SUBSCRIPT,
   AST_EXPR_STMT,
   AST_SHOW_STMT,
+  AST_VAR_DECL,
   AST_PROGRAM,
 } AstTy;
 
@@ -120,6 +123,13 @@ typedef struct {
 
 typedef struct {
   AstTy type;
+  int line;
+  int len;
+  char* name;
+} VarNode;
+
+typedef struct {
+  AstTy type;
   Vec decls;
 } ProgramNode;
 
@@ -131,6 +141,7 @@ union AstNode {
   StringNode str;
   ListNode list;
   MapNode map;
+  VarNode var;
   ExprStmtNode expr_stmt;
   ShowStmtNode show_stmt;
   SubscriptNode subscript;

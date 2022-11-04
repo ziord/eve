@@ -48,6 +48,8 @@ static AstNode* parse_list(Parser* parser);
 static AstNode* parse_map(Parser* parser);
 static AstNode* parse_subscript(Parser* parser, AstNode* left);
 static AstNode* parse_stmt(Parser* parser);
+static AstNode* parse_var_decl(Parser* parser);
+static AstNode* parse_var(Parser* parser);
 
 // clang-format off
 ParseTable p_table[] = {
@@ -88,6 +90,8 @@ ParseTable p_table[] = {
   [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_SHOW] = {.bp = BP_NONE, .prefix = parse_stmt, .infix = NULL},
+  [TK_LET] = {.bp = BP_NONE, .prefix = parse_var_decl, .infix = NULL},
+  [TK_IDENT] = {.bp = BP_NONE, .prefix = parse_var, .infix = NULL},
   [TK_STRING] = {.bp = BP_NONE, .prefix = parse_string, .infix = NULL},
   [TK_EOF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ERROR] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -460,7 +464,46 @@ static AstNode* parse_stmt(Parser* parser) {
   return parse_expr_stmt(parser);
 }
 
+static AstNode* parse_var_decl(Parser* parser) {
+  // let foo = expr;
+  int line = parser->current_tk.line;
+  AstNode* var = new_node(&parser->store);
+  advance(parser);
+  consume(parser, TK_IDENT);
+  var->var = (VarNode) {
+      .type = AST_VAR,
+      .name = parser->previous_tk.value,
+      .len = parser->previous_tk.length,
+      .line = line};
+  consume(parser, TK_EQ);
+  AstNode* value = parse_expr(parser);
+  AstNode* decl = new_node(&parser->store);
+  decl->binary = (BinaryNode) {
+      .type = AST_VAR_DECL,
+      .line = line,
+      .l_node = var,
+      .r_node = value,
+      .op = get_op(TK_EQ)};
+  consume(parser, TK_SEMI_COLON);
+  return decl;
+}
+
+static AstNode* parse_var(Parser* parser) {
+  advance(parser);
+  Token tok = parser->previous_tk;
+  AstNode* node = new_node(&parser->store);
+  node->var = (VarNode) {
+      .line = tok.line,
+      .len = tok.length,
+      .name = tok.value,
+      .type = AST_VAR};
+  return node;
+}
+
 static AstNode* parse_decls(Parser* parser) {
+  if (is_tty(parser, TK_LET)) {
+    return parse_var_decl(parser);
+  }
   return parse_stmt(parser);
 }
 

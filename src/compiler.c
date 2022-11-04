@@ -33,6 +33,17 @@ Compiler new_compiler(AstNode* node, Code* code, VM* vm) {
   return compiler;
 }
 
+static int store_variable(Compiler* compiler, VarNode* var) {
+  Value val = create_string(
+      compiler->vm,
+      &compiler->vm->strings,
+      var->name,
+      var->len,
+      false);
+  int slot = write_value(&compiler->code->vpool, val, compiler->vm);
+  return slot;
+}
+
 void c_num(Compiler* compiler, AstNode* node) {
   NumberNode* num = CAST(NumberNode*, node);
   emit_value(compiler, $LOAD_CONST, NUMBER_VAL(num->value), num->line);
@@ -145,6 +156,21 @@ void c_show_stmt(Compiler* compiler, AstNode* node) {
   emit_byte(compiler, (byte_t)node->show_stmt.length, node->show_stmt.line);
 }
 
+void c_var(Compiler* compiler, AstNode* node) {
+  VarNode* var = CAST(VarNode*, node);
+  byte_t slot = store_variable(compiler, var);
+  emit_byte(compiler, $GET_GLOBAL, var->line);
+  emit_byte(compiler, slot, var->line);
+}
+
+void c_var_decl(Compiler* compiler, AstNode* node) {
+  BinaryNode* decl = CAST(BinaryNode*, node);
+  byte_t slot = store_variable(compiler, &decl->l_node->var);
+  c_(compiler, decl->r_node);
+  emit_byte(compiler, $DEFINE_GLOBAL, decl->line);
+  emit_byte(compiler, slot, decl->line);
+}
+
 void c_program(Compiler* compiler, AstNode* node) {
   ProgramNode* program = CAST(ProgramNode*, node);
   for (int i = 0; i < program->decls.len; i++) {
@@ -184,6 +210,12 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_SHOW_STMT:
       c_show_stmt(compiler, node);
+      break;
+    case AST_VAR_DECL:
+      c_var_decl(compiler, node);
+      break;
+    case AST_VAR:
+      c_var(compiler, node);
       break;
     case AST_PROGRAM:
       c_program(compiler, node);

@@ -108,7 +108,10 @@ char* get_src_at_line(Lexer* lexer, Token token, int* padding, int* len) {
       line++;
     }
   }
-  start++;
+  if (line > 1) {
+    // escape \n if we stumble past the first line
+    start++;
+  }
   char* end = start;
   while (*end != '\n') {
     if (*end == '\0')
@@ -116,7 +119,7 @@ char* get_src_at_line(Lexer* lexer, Token token, int* padding, int* len) {
     end++;
   }
   *padding = token.column - token.length - 1;
-  *len = end - start;
+  *len = (int)(end - start);
   return start;
 }
 
@@ -219,6 +222,7 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
     case 'i':
     case 'e':
     case 'l':
+      return expect(lexer, "et", 1, 2, TK_LET);
     default:
       break;
   }

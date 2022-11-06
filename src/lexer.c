@@ -23,7 +23,7 @@ char* token_types[] = {
     [TK_TRUE] = "true",       [TK_NONE] = "None",
     [TK_SHOW] = "show",       [TK_IDENT] = "<identifier>",
     [TK_STRING] = "<string>", [TK_EOF] = "<eof>",
-    [TK_ERROR] = "<error>",
+    [TK_ERROR] = "<error>",   [TK_LET] = "let",
 };
 
 void init_lexer(Lexer* lexer, char* src) {
@@ -181,6 +181,7 @@ Token lex_num(Lexer* lexer, char start) {
   bool is_exp = !is_hex && tolower(curr) == 'e';
   bool is_dec = curr == '.';
   if (is_dec || is_exp || is_hex) {
+  rescan:
     advance(lexer);
     // treat e[+|-]?
     if (is_exp && (PEEK(lexer) == '+' || PEEK(lexer) == '-')) {
@@ -196,6 +197,10 @@ Token lex_num(Lexer* lexer, char start) {
       }
     }
   }
+  if (!is_exp && tolower(PEEK(lexer)) == 'e') {
+    is_exp = true;
+    goto rescan;
+  }
   return new_token(lexer, TK_NUM);
 }
 
@@ -204,6 +209,8 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
   // true, false, None, struct, while,
   // return, if, else, fn, let, show
   switch (ch) {
+    case 'a':
+      return expect(lexer, "ssert", 1, 5, TK_ASSERT);
     case 't':
       return expect(lexer, "rue", 1, 3, TK_TRUE);
     case 'f':
@@ -231,7 +238,7 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
 }
 
 Token lex_ident(Lexer* lexer, char ch) {
-  while (is_alpha(PEEK(lexer))) {
+  while (is_alpha(PEEK(lexer)) || isdigit(PEEK(lexer))) {
     advance(lexer);
   }
   return new_token(lexer, keyword_type(lexer, ch));
@@ -258,6 +265,10 @@ Token lex_string(Lexer* lexer, char start) {
   Token tok = new_token(lexer, TK_STRING);
   tok.has_esc = has_esc;
   return tok;
+}
+
+bool is_current_symbol(Lexer* lexer, char ch) {
+  return PEEK(lexer) == ch;
 }
 
 Token get_token(Lexer* lexer) {

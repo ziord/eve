@@ -46,7 +46,7 @@ typedef uint64_t Value;
 
 #define AS_STRING(val) ((ObjString*)(AS_OBJ(val)))
 #define AS_LIST(val) ((ObjList*)(AS_OBJ(val)))
-#define AS_MAP(val) ((ObjHashMap*)(AS_OBJ(val)))
+#define AS_HMAP(val) ((ObjHashMap*)(AS_OBJ(val)))
 
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
@@ -79,7 +79,7 @@ typedef struct Obj {
 typedef struct {
   Obj obj;
   uint32_t hash;
-  int len;
+  int length;
   char* str;
 } ObjString;
 
@@ -119,6 +119,8 @@ char* get_value_type(Value val);
 void print_value(Value val);
 bool value_falsy(Value v);
 bool value_equal(Value a, Value b);
+Value object_to_string(VM* vm, Value val);
+Value value_to_string(VM* vm, Value val);
 Value create_string(
     VM* vm,
     ObjHashMap* table,
@@ -128,7 +130,7 @@ Value create_string(
 ObjList* create_list(VM* vm, int len);
 ObjHashMap* create_hashmap(VM* vm);
 void hashmap_init(ObjHashMap* table);
-void hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);
+bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);
 Value hashmap_get(ObjHashMap* table, Value key);
 bool hashmap_remove(ObjHashMap* table, Value key);
 ObjString*

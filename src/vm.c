@@ -62,17 +62,19 @@ inline static void print_stack(VM* vm) {
 
 VM new_vm() {
   VM vm = {.code = NULL, .ip = NULL, .sp = NULL};
+  hashmap_init(&vm.strings);
+  hashmap_init(&vm.globals);
   return vm;
 }
 
-void init_vm(VM* vm, Code* code) {
+void boot_vm(VM* vm, Code* code) {
   vm->code = code;
   vm->ip = vm->code->bytes;
   vm->sp = vm->stack;
   vm->objects = NULL;
   vm->bytes_alloc = 0;
-  hashmap_init(&vm->strings);
   hashmap_init(&vm->globals);
+  // assumes that 'strings' hashmap has been initialized already by the compiler
 }
 
 static IResult runtime_error(VM* vm, char* fmt, ...) {
@@ -127,17 +129,20 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
       return true;
     }
   } else if (IS_HMAP(val)) {
-    Value res = hashmap_get(AS_MAP(val), subscript);
+    Value res = hashmap_get(AS_HMAP(val), subscript);
     if (res != NOTHING_VAL) {
       push_stack(vm, res);
       return true;
     } else {
-      runtime_error(vm, "hashmap has no such key");
+      runtime_error(
+          vm,
+          "hashmap has no such key: '%s'",
+          AS_STRING(value_to_string(vm, subscript))->str);
     }
   } else if (IS_STRING(val)) {
     ObjString* str = AS_STRING(val);
     int64_t index;
-    if (validate_subscript(vm, subscript, str->len, "string", &index)) {
+    if (validate_subscript(vm, subscript, str->length, "string", &index)) {
       Value new_str =
           create_string(vm, &vm->strings, &str->str[index], 1, false);
       push_stack(vm, new_str);
@@ -149,6 +154,31 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
         "'%s' type is not subscriptable",
         get_value_type(val));
   }
+  return false;
+}
+
+static bool
+perform_subscript_assign(VM* vm, Value var, Value subscript, Value value) {
+  if (IS_LIST(var)) {
+    ObjList* list = AS_LIST(var);
+    int64_t index;
+    if (validate_subscript(
+            vm,
+            subscript,
+            list->elems.length,
+            "list",
+            &index)) {
+      list->elems.buffer[index] = value;
+      return true;
+    }
+  } else if (IS_HMAP(var)) {
+    hashmap_put(AS_HMAP(var), vm, subscript, value);
+    return true;
+  }
+  runtime_error(
+      vm,
+      "'%s' type is not subscript-assignable",
+      get_value_type(var));
   return false;
 }
 
@@ -180,6 +210,28 @@ IResult run(VM* vm) {
               vm,
               "Name '%s' is not defined",
               AS_STRING(var)->str);
+        }
+        break;
+      }
+      case $SET_GLOBAL: {
+        Value var = READ_CONST(vm);
+        if (hashmap_put(&vm->globals, vm, var, PEEK_STACK(vm))) {
+          // true if key is new - new insertion, false if key already exists
+          hashmap_remove(&vm->globals, var);
+          ObjString* str = AS_STRING(value_to_string(vm, var));
+          return runtime_error(
+              vm,
+              "use of undefined variable '%s'",
+              str->str);
+        }
+        break;
+      }
+      case $SET_SUBSCRIPT: {
+        Value subscript = pop_stack(vm);
+        Value var = pop_stack(vm);
+        Value value = PEEK_STACK(vm);
+        if (!perform_subscript_assign(vm, var, subscript, value)) {
+          return RESULT_RUNTIME_ERROR;
         }
         break;
       }
@@ -287,6 +339,17 @@ IResult run(VM* vm) {
         vm->sp -= len;
         break;
       }
+      case $ASSERT: {
+        Value test = pop_stack(vm);
+        Value msg = pop_stack(vm);
+        if (value_falsy(test)) {
+          return runtime_error(
+              vm,
+              "Assertion Failed: %s",
+              AS_STRING(value_to_string(vm, msg))->str);
+        }
+        break;
+      }
       case $JMP: {
         uint16_t offset = READ_SHORT(vm);
         vm->ip += offset;
@@ -333,7 +396,7 @@ IResult run(VM* vm) {
       case $BW_XOR: {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
-        BINARY_CHECK(vm, %, a, b, IS_NUMBER);
+        BINARY_CHECK(vm, ^, a, b, IS_NUMBER);
         push_stack(
             vm,
             NUMBER_VAL(((int64_t)AS_NUMBER(a) ^ (int64_t)AS_NUMBER(b))));
@@ -342,7 +405,7 @@ IResult run(VM* vm) {
       case $BW_OR: {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
-        BINARY_CHECK(vm, %, a, b, IS_NUMBER);
+        BINARY_CHECK(vm, |, a, b, IS_NUMBER);
         push_stack(
             vm,
             NUMBER_VAL(((int64_t)AS_NUMBER(a) | (int64_t)AS_NUMBER(b))));
@@ -351,7 +414,7 @@ IResult run(VM* vm) {
       case $BW_AND: {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
-        BINARY_CHECK(vm, %, a, b, IS_NUMBER);
+        BINARY_CHECK(vm, &, a, b, IS_NUMBER);
         push_stack(
             vm,
             NUMBER_VAL(((int64_t)AS_NUMBER(a) & (int64_t)AS_NUMBER(b))));

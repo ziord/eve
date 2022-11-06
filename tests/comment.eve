@@ -10,4 +10,8 @@ comment section.
 *
 *#
 ###{[]: 0xff, 5: 10, "fox": "fish"};
-show "OK.";
+let x = #{"foo":
+## nada
+"bar"
+};
+assert x["foo"] == "bar", "should be bar";

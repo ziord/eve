@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "misc-no-recursion"
 #include "compiler.h"
 
 #include "gen.h"
@@ -31,6 +33,11 @@ void c_(Compiler* compiler, AstNode* node);
 Compiler new_compiler(AstNode* node, Code* code, VM* vm) {
   Compiler compiler = {.root = node, .code = code, .vm = vm};
   return compiler;
+}
+
+static void compile_error(Compiler* compiler, AstNode* node, char* msg) {
+  (void)node;
+  error(msg);
 }
 
 static int store_variable(Compiler* compiler, VarNode* var) {
@@ -156,11 +163,42 @@ void c_show_stmt(Compiler* compiler, AstNode* node) {
   emit_byte(compiler, (byte_t)node->show_stmt.length, node->show_stmt.line);
 }
 
+void c_assert_stmt(Compiler* compiler, AstNode* node) {
+  c_(compiler, node->assert_stmt.msg);
+  c_(compiler, node->assert_stmt.test);
+  emit_byte(compiler, $ASSERT, node->assert_stmt.line);
+}
+
 void c_var(Compiler* compiler, AstNode* node) {
   VarNode* var = CAST(VarNode*, node);
   byte_t slot = store_variable(compiler, var);
   emit_byte(compiler, $GET_GLOBAL, var->line);
   emit_byte(compiler, slot, var->line);
+}
+
+void c_var_assign(Compiler* compiler, BinaryNode* assign) {
+  // globals
+  c_(compiler, assign->r_node);
+  int slot = store_variable(compiler, &assign->l_node->var);
+  emit_byte(compiler, $SET_GLOBAL, assign->line);
+  emit_byte(compiler, (byte_t)slot, assign->line);
+}
+
+void c_subscript_assign(Compiler* compiler, BinaryNode* assign) {
+  c_(compiler, assign->r_node);
+  c_(compiler, assign->l_node);
+  compiler->code->bytes[compiler->code->length - 1] = $SET_SUBSCRIPT;
+}
+
+void c_assign(Compiler* compiler, AstNode* node) {
+  BinaryNode* assign = CAST(BinaryNode*, node);
+  if (assign->l_node->num.type == AST_VAR) {
+    c_var_assign(compiler, assign);
+  } else if (assign->l_node->num.type == AST_SUBSCRIPT) {
+    c_subscript_assign(compiler, assign);
+  } else {
+    compile_error(compiler, node, "Invalid assignment target");
+  }
 }
 
 void c_var_decl(Compiler* compiler, AstNode* node) {
@@ -217,6 +255,12 @@ void c_(Compiler* compiler, AstNode* node) {
     case AST_VAR:
       c_var(compiler, node);
       break;
+    case AST_ASSIGN:
+      c_assign(compiler, node);
+      break;
+    case AST_ASSERT_STMT:
+      c_assert_stmt(compiler, node);
+      break;
     case AST_PROGRAM:
       c_program(compiler, node);
       break;
@@ -229,3 +273,4 @@ void compile(Compiler* compiler) {
   c_(compiler, compiler->root);
   emit_byte(compiler, $RET, 100);
 }
+#pragma clang diagnostic pop

@@ -1,6 +1,13 @@
 let x = 5;
 let y = #{x: x ** 2, "facts": "this is a pilot"};
-show x, y;
-## list
+assert y[x] == 25;
 let z = [x, y];
-show z;
+assert z[-1] == y;
+x = z;
+assert x == z;
+let p_0 = (z[-2] += 10);
+let _p1 = p_0;
+let p2 = p_0 * _p1;
+assert _p1 == p_0 && p2 == _p1 ** 2;
+assert p_0 == 15 && z[-2] == 15;
+assert z[-1]["facts"] == "this is a pilot";

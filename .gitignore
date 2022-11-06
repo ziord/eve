@@ -2,3 +2,4 @@ grammars
 build
 .idea
 dump.txt
+tests/out.txt

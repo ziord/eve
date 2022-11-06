@@ -46,6 +46,7 @@ typedef enum {
   TK_NONE,          // None
   TK_SHOW,          // show
   TK_LET,           // let
+  TK_ASSERT,        // assert
   TK_IDENT,         // identifier
   TK_STRING,        // "..."
   TK_EOF,           // EOF
@@ -72,6 +73,7 @@ typedef struct {
 
 void init_lexer(Lexer* lexer, char* src);
 char* get_src_at_line(Lexer* lexer, Token token, int* padding, int* len);
+bool is_current_symbol(Lexer* lexer, char ch);
 Token get_token(Lexer* lexer);
 
 #endif  //EVE_LEXER_H

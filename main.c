@@ -22,7 +22,7 @@ int execute(char* fp) {
   dis_code(&code, "test");
   free_parser(&parser);
   // run
-  init_vm(&vm, &code);
+  boot_vm(&vm, &code);
   IResult ret = run(&vm);
   // destruct
   free_code(&code, &vm);

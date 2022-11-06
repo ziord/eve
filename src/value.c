@@ -43,6 +43,8 @@ char* get_value_type(Value val) {
     return "number";
   } else if (IS_BOOL(val)) {
     return "bool";
+  } else if (IS_NONE(val)) {
+    return "None";
   } else {
     UNREACHABLE("unknown value type");
   }
@@ -67,7 +69,7 @@ void print_object(Value val, Obj* obj) {
       break;
     }
     case OBJ_HMAP: {
-      ObjHashMap* map = AS_MAP(val);
+      ObjHashMap* map = AS_HMAP(val);
       printf("#{");
       if (map->length) {
         HashEntry* entry;
@@ -111,7 +113,9 @@ void print_value(Value val) {
 bool value_falsy(Value v) {
   return (
       IS_NUMBER(v) && !AS_NUMBER(v) || (IS_BOOL(v) && !AS_BOOL(v))
-      || IS_NONE(v));
+      || IS_NONE(v) || (IS_LIST(v) && !AS_LIST(v)->elems.length)
+      || (IS_STRING(v) && !AS_STRING(v)->length)
+      || (IS_HMAP(v) && !AS_HMAP(v)->length));
 }
 
 bool value_equal(Value a, Value b) {
@@ -119,6 +123,54 @@ bool value_equal(Value a, Value b) {
     return AS_NUMBER(a) == AS_NUMBER(b);
   }
   return a == b;
+}
+
+Value object_to_string(VM* vm, Value val) {
+  switch (AS_OBJ(val)->type) {
+    case OBJ_STR:
+      return (val);
+    case OBJ_LIST: {
+      char buff[15];
+      int len = snprintf(buff, 15, "@list[%d]", AS_LIST(val)->elems.length);
+      return (create_string(vm, &vm->strings, buff, len, false));
+    }
+    case OBJ_HMAP: {
+      char buff[20];
+      int len = snprintf(buff, 20, "@hashmap[%d]", AS_HMAP(val)->length);
+      return (create_string(vm, &vm->strings, buff, len, false));
+    }
+    default:
+      UNREACHABLE("object value to string");
+  }
+}
+
+Value value_to_string(VM* vm, Value val) {
+  if (IS_OBJ(val)) {
+    return object_to_string(vm, val);
+  } else if (IS_NUMBER(val)) {
+    double value = AS_NUMBER(val);
+    if (isnan(value)) {
+      return (create_string(vm, &vm->strings, "nan", 3, false));
+    } else if (isinf(value)) {
+      if (value > 0) {
+        return (create_string(vm, &vm->strings, "inf", 3, false));
+      } else {
+        return (create_string(vm, &vm->strings, "-inf", 3, false));
+      }
+    } else {
+      char buff[25];
+      int len = snprintf(buff, 25, "%g", AS_NUMBER(val));
+      return (create_string(vm, &vm->strings, buff, len, false));
+    }
+  } else if (IS_BOOL(val)) {
+    int size;
+    char* bol = AS_BOOL(val) ? (size = 4, "true") : (size = 5, "false");
+    return (create_string(vm, &vm->strings, bol, size, false));
+  } else if (IS_NONE(val)) {
+    return (create_string(vm, &vm->strings, "None", 4, false));
+  } else {
+    UNREACHABLE("primitive value to string");
+  }
 }
 
 /*********************
@@ -153,11 +205,11 @@ Value create_string(
     string->hash = hash;
     if (!is_alloc) {
       string->str = ALLOC(vm, char, len + 1);
-      string->len = copy_str_compact(vm, str, &string->str, len);
-      string->str[string->len] = '\0';
+      string->length = copy_str_compact(vm, str, &string->str, len);
+      string->str[string->length] = '\0';
     } else {
       string->str = str;
-      string->len = len;
+      string->length = len;
       // track the already allocated bytes
       vm->bytes_alloc += len;
     }
@@ -238,7 +290,7 @@ find_entry(HashEntry* entries, int capacity, HashEntry** slot, Value key) {
   if (capacity == 0)
     return false;
   int cap = capacity - 1;
-  uint32_t start_index = hash_value(key) & capacity;
+  uint32_t start_index = hash_value(key) & cap;
   uint32_t index = start_index;
   HashEntry *deleted = NULL, *entry;
   do {
@@ -303,13 +355,15 @@ static void rehash(ObjHashMap* table, VM* vm) {
   table->capacity = capacity;
 }
 
-void hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value) {
+bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value) {
   if (table->length >= table->capacity * LOAD_FACTOR) {
     rehash(table, vm);
   }
   if (insert_entry(table->entries, key, value, table->capacity)) {
     table->length++;
+    return true;
   }
+  return false;
 }
 
 Value hashmap_get(ObjHashMap* table, Value key) {
@@ -356,7 +410,7 @@ ObjString* hashmap_find_interned(
         return NULL;
     } else if (IS_STRING(entry->key)) {
       ObjString* string = AS_STRING(entry->key);
-      if (string->len == len && string->hash == hash
+      if (string->length == len && string->hash == hash
           && memcmp(string->str, str, len) == 0) {
         return string;
       }

@@ -26,7 +26,7 @@ typedef struct VM {
 } VM;
 
 VM new_vm();
-void init_vm(VM* vm, Code* code);
+void boot_vm(VM* vm, Code* code);
 IResult run(VM* vm);
 
 #endif  //EVE_VM_H

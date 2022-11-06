@@ -87,6 +87,10 @@ int dis_instruction(Code* code, int index) {
       return plain_instruction("$POP", index);
     case $SUBSCRIPT:
       return plain_instruction("$SUBSCRIPT", index);
+    case $SET_SUBSCRIPT:
+      return plain_instruction("$SET_SUBSCRIPT", index);
+    case $ASSERT:
+      return plain_instruction("$ASSERT", index);
     case $JMP:
       return jump_instruction("$JMP", code, index, 1);
     case $JMP_FALSE:
@@ -105,6 +109,8 @@ int dis_instruction(Code* code, int index) {
       return constant_instruction("$DEFINE_GLOBAL", code, index);
     case $GET_GLOBAL:
       return constant_instruction("$GET_GLOBAL", code, index);
+    case $SET_GLOBAL:
+      return constant_instruction("$SET_GLOBAL", code, index);
     default:
       return plain_instruction("UNKNOWN_OPCODE", index);
   }

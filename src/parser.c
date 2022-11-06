@@ -5,8 +5,8 @@
   char _buff[BUFFER_SIZE]; \
   snprintf(_buff, BUFFER_SIZE, __VA_ARGS__);
 
-typedef AstNode* (*PrefixFn)(Parser*);
-typedef AstNode* (*InfixFn)(Parser*, AstNode*);
+typedef AstNode* (*PrefixFn)(Parser*, bool);
+typedef AstNode* (*InfixFn)(Parser*, AstNode*, bool);
 extern Error error_types[];
 extern char* token_types[];
 extern AstNode* error_node;
@@ -35,25 +35,25 @@ typedef struct {
   BindingPower bp;
   PrefixFn prefix;
   InfixFn infix;
-} ParseTable;
+} ExprParseTable;
 
 static AstNode* _parse(Parser* parser, BindingPower bp);
 static AstNode* parse_expr(Parser* parser);
-static AstNode* parse_num(Parser* parser);
-static AstNode* parse_unary(Parser* parser);
-static AstNode* parse_literal(Parser* parser);
-static AstNode* parse_binary(Parser* parser, AstNode* left);
-static AstNode* parse_string(Parser* parser);
-static AstNode* parse_grouping(Parser* parser);
-static AstNode* parse_list(Parser* parser);
-static AstNode* parse_map(Parser* parser);
-static AstNode* parse_subscript(Parser* parser, AstNode* left);
-static AstNode* parse_stmt(Parser* parser);
-static AstNode* parse_var_decl(Parser* parser);
-static AstNode* parse_var(Parser* parser);
+static AstNode* parse_num(Parser* parser, bool assignable);
+static AstNode* parse_unary(Parser* parser, bool assignable);
+static AstNode* parse_literal(Parser* parser, bool assignable);
+static AstNode*
+parse_binary(Parser* parser, AstNode* left, bool assignable);
+static AstNode* parse_string(Parser* parser, bool assignable);
+static AstNode* parse_grouping(Parser* parser, bool assignable);
+static AstNode* parse_list(Parser* parser, bool assignable);
+static AstNode* parse_map(Parser* parser, bool assignable);
+static AstNode*
+parse_subscript(Parser* parser, AstNode* left, bool assignable);
+static AstNode* parse_var(Parser* parser, bool assignable);
 
 // clang-format off
-ParseTable p_table[] = {
+ExprParseTable p_table[] = {
   [TK_NUM] = {.bp = BP_NONE, .prefix = parse_num, .infix = NULL},
   [TK_PLUS] = {.bp = BP_TERM, .prefix = parse_unary, .infix = parse_binary},
   [TK_MINUS] = {.bp = BP_TERM, .prefix = parse_unary, .infix = parse_binary},
@@ -90,8 +90,8 @@ ParseTable p_table[] = {
   [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
-  [TK_SHOW] = {.bp = BP_NONE, .prefix = parse_stmt, .infix = NULL},
-  [TK_LET] = {.bp = BP_NONE, .prefix = parse_var_decl, .infix = NULL},
+  [TK_SHOW] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_LET] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_IDENT] = {.bp = BP_NONE, .prefix = parse_var, .infix = NULL},
   [TK_STRING] = {.bp = BP_NONE, .prefix = parse_string, .infix = NULL},
   [TK_EOF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -227,6 +227,39 @@ bool match(Parser* parser, TokenTy ty) {
   return false;
 }
 
+inline static int count_escapes(char* src, int len) {
+  char* p = strchr(src, '\\');
+  int count = 0;
+  while (p != NULL) {
+    if (p - src >= len) {
+      break;
+    }
+    count++;
+    p = strchr(p + 1, '\\');
+  }
+  return count;
+}
+
+inline static bool is_assignable_op(TokenTy ty) {
+  switch (ty) {
+    case TK_PLUS:
+    case TK_MINUS:
+    case TK_STAR:
+    case TK_STAR_STAR:
+    case TK_FSLASH:
+    case TK_PERCENT:
+    case TK_AMP:
+    case TK_CARET:
+    case TK_PIPE:
+    case TK_LBRACK:
+    case TK_LSHIFT:
+    case TK_RSHIFT:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static AstNode* _parse(Parser* parser, BindingPower bp) {
   PrefixFn pref = p_table[parser->current_tk.ty].prefix;
   if (pref == NULL) {
@@ -237,15 +270,63 @@ static AstNode* _parse(Parser* parser, BindingPower bp) {
     ErrorArgs args = new_error_arg(NULL, buff, NULL);
     return parse_error(parser, E0005, &args);
   }
-  AstNode* node = pref(parser);
+  bool assignable = bp <= BP_ASSIGNMENT;
+  AstNode* node = pref(parser, assignable);
   while (bp < p_table[parser->current_tk.ty].bp) {
     InfixFn inf = p_table[parser->current_tk.ty].infix;
-    node = inf(parser, node);
+    node = inf(parser, node, assignable);
   }
   return node;
 }
 
-static AstNode* parse_num(Parser* parser) {
+AstNode* handle_aug_assign(
+    Parser* parser,
+    AstNode* node,
+    bool assignable,
+    Token tok) {
+  //* handle augmented assignments *//
+  if (assignable) {
+    if (is_assignable_op(parser->current_tk.ty)) {
+      if (is_current_symbol(&parser->lexer, '=')) {
+        // +=, -=, ...=
+        // e.g. x += expr => x = x + expr;
+        tok = parser->current_tk;
+        OpTy op = get_op(parser->current_tk.ty);
+        advance(parser);  // skip assignable op
+        advance(parser);  // skip '='
+        AstNode* value = parse_expr(parser);
+        AstNode* binop = new_node(parser);
+        binop->binary = (BinaryNode) {
+            .line = tok.line,
+            .type = AST_BINARY,
+            .l_node = node,
+            .r_node = value,
+            .op = op};
+        AstNode* assignment = new_node(parser);
+        assignment->binary = (BinaryNode) {
+            .line = tok.line,
+            .type = AST_ASSIGN,
+            .l_node = node,
+            .r_node = binop,
+            .op = get_op(TK_EQ)};
+        return assignment;
+      }
+    } else if (match(parser, TK_EQ)) {
+      AstNode* value = parse_expr(parser);
+      AstNode* assignment = new_node(parser);
+      assignment->binary = (BinaryNode) {
+          .line = tok.line,
+          .type = AST_ASSIGN,
+          .l_node = node,
+          .r_node = value,
+          .op = get_op(TK_EQ)};
+      return assignment;
+    }
+  }
+  return node;
+}
+
+static AstNode* parse_num(Parser* parser, bool assignable) {
   int line = parser->current_tk.line;
   consume(parser, TK_NUM);
   Token tok = parser->previous_tk;
@@ -261,20 +342,7 @@ static AstNode* parse_num(Parser* parser) {
   return node;
 }
 
-inline static int count_escapes(char* src, int len) {
-  char* p = strchr(src, '\\');
-  int count = 0;
-  while (p != NULL) {
-    if (p - src >= len) {
-      break;
-    }
-    count++;
-    p = strchr(p + 1, '\\');
-  }
-  return count;
-}
-
-static AstNode* parse_string(Parser* parser) {
+static AstNode* parse_string(Parser* parser, bool assignable) {
   AstNode* node = new_node(parser);
   Token tok = parser->current_tk;
   char* src = tok.value + 1;  // skip opening quot
@@ -302,14 +370,14 @@ static AstNode* parse_string(Parser* parser) {
   return node;
 }
 
-static AstNode* parse_grouping(Parser* parser) {
+static AstNode* parse_grouping(Parser* parser, bool assignable) {
   advance(parser);  // skip '(' token
   AstNode* node = parse_expr(parser);
   consume(parser, TK_RBRACK);
   return node;
 }
 
-static AstNode* parse_list(Parser* parser) {
+static AstNode* parse_list(Parser* parser, bool assignable) {
   advance(parser);  // skip '[' token
   AstNode* node = new_node(parser);
   ListNode* list = &node->list;
@@ -330,7 +398,7 @@ static AstNode* parse_list(Parser* parser) {
   return node;
 }
 
-static AstNode* parse_map(Parser* parser) {
+static AstNode* parse_map(Parser* parser, bool assignable) {
   // #{key: value}
   int line = parser->current_tk.line;
   advance(parser);  // skip '#' token
@@ -359,7 +427,7 @@ static AstNode* parse_map(Parser* parser) {
   return node;
 }
 
-static AstNode* parse_literal(Parser* parser) {
+static AstNode* parse_literal(Parser* parser, bool assignable) {
   int false_val = 0, true_val = 0, none_val = 0;
   int line = parser->current_tk.line;
   switch (parser->current_tk.ty) {
@@ -387,7 +455,7 @@ static AstNode* parse_literal(Parser* parser) {
   return node;
 }
 
-static AstNode* parse_unary(Parser* parser) {
+static AstNode* parse_unary(Parser* parser, bool assignable) {
   OpTy op = get_op(parser->current_tk.ty);
   int line = parser->current_tk.line;
   BindingPower bp = p_table[parser->current_tk.ty].bp;
@@ -396,28 +464,30 @@ static AstNode* parse_unary(Parser* parser) {
   return new_unary(&parser->store, node, line, op);
 }
 
-static AstNode* parse_binary(Parser* parser, AstNode* left) {
+static AstNode*
+parse_binary(Parser* parser, AstNode* left, bool assignable) {
   int line = parser->current_tk.line;
   BindingPower bp = p_table[parser->current_tk.ty].bp;
-  // this is guaranteed to be valid by the ParseTable
+  // this is guaranteed to be valid by the ExprParseTable
   OpTy op = get_op(parser->current_tk.ty);
   advance(parser);
   AstNode* right = _parse(parser, bp);
   return new_binary(&parser->store, left, right, line, op);
 }
 
-static AstNode* parse_subscript(Parser* parser, AstNode* left) {
-  int line = parser->current_tk.line;
+static AstNode*
+parse_subscript(Parser* parser, AstNode* left, bool assignable) {
+  Token tok = parser->current_tk;
   advance(parser);  // skip '[' token
   AstNode* expr = parse_expr(parser);
   consume(parser, TK_RSQ_BRACK);
   AstNode* node = new_node(parser);
   SubscriptNode* subscript = &node->subscript;
   subscript->type = AST_SUBSCRIPT;
-  subscript->line = line;
+  subscript->line = tok.line;
   subscript->expr = left;
   subscript->subscript = expr;
-  return node;
+  return handle_aug_assign(parser, node, assignable, tok);
 }
 
 static AstNode* parse_expr(Parser* parser) {
@@ -457,9 +527,38 @@ static AstNode* parse_show_stmt(Parser* parser) {
   return stmt;
 }
 
+static AstNode* parse_assert_stmt(Parser* parser) {
+  Token tok = parser->current_tk;
+  advance(parser);  // skip token 'assert'
+  AstNode* stmt = new_node(parser);
+  AstNode* test = parse_expr(parser);
+  AstNode* msg = NULL;
+  if (match(parser, TK_COMMA)) {
+    msg = parse_expr(parser);
+  } else {
+    char* buff = "Assertion failed. Test is falsy.";
+    msg = new_node(parser);
+    msg->str = (StringNode) {
+        .type = AST_STR,
+        .line = parser->previous_tk.line,
+        .is_alloc = false,
+        .start = buff,
+        .length = (int)strlen(buff)};
+  }
+  stmt->assert_stmt = (AssertStmtNode) {
+      .type = AST_ASSERT_STMT,
+      .line = tok.line,
+      .test = test,
+      .msg = msg};
+  consume(parser, TK_SEMI_COLON);
+  return stmt;
+}
+
 static AstNode* parse_stmt(Parser* parser) {
   if (is_tty(parser, TK_SHOW)) {
     return parse_show_stmt(parser);
+  } else if (is_tty(parser, TK_ASSERT)) {
+    return parse_assert_stmt(parser);
   }
   return parse_expr_stmt(parser);
 }
@@ -488,7 +587,7 @@ static AstNode* parse_var_decl(Parser* parser) {
   return decl;
 }
 
-static AstNode* parse_var(Parser* parser) {
+static AstNode* parse_var(Parser* parser, bool assignable) {
   advance(parser);
   Token tok = parser->previous_tk;
   AstNode* node = new_node(parser);
@@ -497,18 +596,16 @@ static AstNode* parse_var(Parser* parser) {
       .len = tok.length,
       .name = tok.value,
       .type = AST_VAR};
-  return node;
+  return handle_aug_assign(parser, node, assignable, tok);
 }
 
 void resync(Parser* parser) {
   parser->panicking = false;
   for (;;) {
-    if (parser->previous_tk.ty == TK_SEMI_COLON) {
-      return;
-    }
     switch (parser->current_tk.ty) {
       case TK_LET:
       case TK_SHOW:
+      case TK_ASSERT:
       case TK_EOF:
         return;
       default:

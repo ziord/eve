@@ -1,0 +1,8 @@
+assert !None;
+assert None == None;
+let x = None;
+let y = #{x : x, "z": [None]};
+assert y[x] == x;
+assert y[None] == x;
+assert !x && !y[x];
+assert y["z"][0] == x;

@@ -37,12 +37,14 @@ typedef enum {
   AST_MAP,
   AST_UNIT,
   AST_VAR,
+  AST_ASSIGN,
   AST_ERROR,
   AST_UNARY,
   AST_BINARY,
   AST_SUBSCRIPT,
   AST_EXPR_STMT,
   AST_SHOW_STMT,
+  AST_ASSERT_STMT,
   AST_VAR_DECL,
   AST_PROGRAM,
 } AstTy;
@@ -118,6 +120,13 @@ typedef struct {
 typedef struct {
   AstTy type;
   int line;
+  AstNode* test;
+  AstNode* msg;
+} AssertStmtNode;
+
+typedef struct {
+  AstTy type;
+  int line;
   int length;
   AstNode* items[BYTE_MAX];
 } ShowStmtNode;
@@ -145,6 +154,7 @@ union AstNode {
   VarNode var;
   ExprStmtNode expr_stmt;
   ShowStmtNode show_stmt;
+  AssertStmtNode assert_stmt;
   SubscriptNode subscript;
   ProgramNode program;
 };

@@ -1,0 +1,9 @@
+assert false != true;
+assert true == true && false == false;
+assert 1 > 0 == true;
+assert !None == true;
+assert !!None == false;
+assert !!0 == false;
+assert 0 || false == false;
+assert 5 && 0xbe || "foxy" == 0xbe;
+assert 5 || 0xbe && "foxy" == 5;

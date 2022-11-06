@@ -36,12 +36,15 @@ typedef enum {
   $BUILD_LIST,
   $BUILD_MAP,
   $POP,
+  $POP_N,
   $DISPLAY,
   $SUBSCRIPT,
   $SET_SUBSCRIPT,
   $DEFINE_GLOBAL,
   $GET_GLOBAL,
+  $GET_LOCAL,
   $SET_GLOBAL,
+  $SET_LOCAL,
   $ASSERT,
   $RET
 } OpCode;

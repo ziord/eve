@@ -16,7 +16,10 @@ void free_store(NodeStore* store) {
     node = (AstNode*)(store->nodes.items[i]);
     if ((node)->num.type == AST_PROGRAM) {
       vec_free(&(node)->program.decls);
+    } else if ((node)->num.type == AST_BLOCK_STMT) {
+      vec_free(&(node)->block_stmt.stmts);
     }
+    // error type asts are not allocated
     if (node->num.type != AST_ERROR) {
       free(node);
     }

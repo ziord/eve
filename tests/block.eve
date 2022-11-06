@@ -1,0 +1,44 @@
+let x = "foo";
+let z = [10];
+let y = "bar";
+{}
+{{{{{{{{{{}}}}}}}}}}
+{5; 6; 7;}
+{
+    let x = 10;
+    let y = 15;
+    z[0] <<= y;
+    assert z[0] == 327680;
+    y *= x;
+    assert y == 150;
+    y = z;
+    y[-1] += 50;
+    assert z[0] == 327730;
+}
+assert x == "foo";
+assert y == "bar";
+{
+ let x = 1;
+ {
+   let x = 2;
+   {
+      let x = 3;
+      {
+        let x = 4;
+        assert x == 4;
+      }
+      assert x == 3;
+   }
+   assert x == 2;
+ }
+ assert x == 1;
+}
+assert x == "foo";
+{
+ let x = 1;
+ {
+  let x = 10;
+  assert x == 10, "scope 2";
+ }
+ assert x == 1, "scope 1";
+}

@@ -51,6 +51,7 @@ static AstNode* parse_map(Parser* parser, bool assignable);
 static AstNode*
 parse_subscript(Parser* parser, AstNode* left, bool assignable);
 static AstNode* parse_var(Parser* parser, bool assignable);
+static AstNode* parse_decls(Parser* parser);
 
 // clang-format off
 ExprParseTable p_table[] = {
@@ -125,7 +126,7 @@ inline static AstNode* new_node(Parser* parser) {
   return new_ast_node(&parser->store);
 }
 
-ErrorArgs new_error_arg(Token* token, char* err, char* hlp) {
+inline static ErrorArgs new_error_arg(Token* token, char* err, char* hlp) {
   return (ErrorArgs) {
       .token = token,
       .err_msg = err,
@@ -388,8 +389,8 @@ static AstNode* parse_list(Parser* parser, bool assignable) {
     if (list->len > 0) {
       consume(parser, TK_COMMA);
     }
-    if (list->len > BYTE_MAX) {
-      CREATE_BUFFER(buff, error_types[E0007].hlp_msg, BYTE_MAX)
+    if (list->len > CONST_MAX) {
+      CREATE_BUFFER(buff, error_types[E0007].hlp_msg, CONST_MAX)
       ErrorArgs args = new_error_arg(NULL, NULL, buff);
       return parse_error(parser, E0007, &args);
     }
@@ -410,8 +411,8 @@ static AstNode* parse_map(Parser* parser, bool assignable) {
   map->type = AST_MAP;
   AstNode *value, *key;
   while (!match(parser, TK_RCURLY)) {
-    if (map->length > BYTE_MAX) {
-      CREATE_BUFFER(buff, error_types[E0009].hlp_msg, BYTE_MAX)
+    if (map->length > CONST_MAX) {
+      CREATE_BUFFER(buff, error_types[E0009].hlp_msg, CONST_MAX)
       ErrorArgs args = new_error_arg(NULL, NULL, buff);
       return parse_error(parser, E0009, &args);
     }
@@ -514,8 +515,8 @@ static AstNode* parse_show_stmt(Parser* parser) {
   show_stmt->type = AST_SHOW_STMT;
   show_stmt->length = 0;
   do {
-    if (show_stmt->length > BYTE_MAX) {
-      CREATE_BUFFER(buff, error_types[E0010].hlp_msg, BYTE_MAX)
+    if (show_stmt->length > CONST_MAX) {
+      CREATE_BUFFER(buff, error_types[E0010].hlp_msg, CONST_MAX)
       ErrorArgs args = new_error_arg(NULL, NULL, buff);
       return parse_error(parser, E0010, &args);
     }
@@ -554,11 +555,28 @@ static AstNode* parse_assert_stmt(Parser* parser) {
   return stmt;
 }
 
+static AstNode* parse_block_stmt(Parser* parser) {
+  advance(parser);  // skip '{' token
+  AstNode* node = new_node(parser);
+  node->block_stmt = (BlockStmtNode) {
+      .type = AST_BLOCK_STMT,
+      .line = parser->previous_tk.line};
+  BlockStmtNode* block = &node->block_stmt;
+  vec_init(&block->stmts);
+  while (!is_tty(parser, TK_RCURLY) && !is_tty(parser, TK_EOF)) {
+    vec_push(&block->stmts, parse_decls(parser));
+  }
+  consume(parser, TK_RCURLY);
+  return node;
+}
+
 static AstNode* parse_stmt(Parser* parser) {
   if (is_tty(parser, TK_SHOW)) {
     return parse_show_stmt(parser);
   } else if (is_tty(parser, TK_ASSERT)) {
     return parse_assert_stmt(parser);
+  } else if (is_tty(parser, TK_LCURLY)) {
+    return parse_block_stmt(parser);
   }
   return parse_expr_stmt(parser);
 }

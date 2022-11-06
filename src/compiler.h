@@ -5,8 +5,19 @@
 #include "parser.h"
 
 typedef struct {
+  bool initialized;
+  int scope;
+  int name_len;
+  char* name;
+} LVar;
+
+typedef struct {
+  int errors;
+  int scope;
+  int locals_count;
   AstNode* root;
   Code* code;
+  LVar locals[CONST_MAX];
   VM* vm;
 } Compiler;
 

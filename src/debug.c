@@ -103,6 +103,12 @@ int dis_instruction(Code* code, int index) {
       return byte_instruction("$BUILD_MAP", code, index);
     case $DISPLAY:
       return byte_instruction("$DISPLAY", code, index);
+    case $POP_N:
+      return byte_instruction("$POP_N", code, index);
+    case $SET_LOCAL:
+      return byte_instruction("$SET_LOCAL", code, index);
+    case $GET_LOCAL:
+      return byte_instruction("$GET_LOCAL", code, index);
     case $LOAD_CONST:
       return constant_instruction("$LOAD_CONST", code, index);
     case $DEFINE_GLOBAL:

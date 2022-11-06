@@ -13,6 +13,10 @@ void vec_push(Vec* vec, void* item) {
   vec->items[vec->len++] = item;
 }
 
+inline int vec_size(Vec* vec) {
+  return vec->len;
+}
+
 void vec_free(Vec* vec) {
   if (!vec->cap)
     return;

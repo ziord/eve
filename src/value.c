@@ -105,6 +105,9 @@ void print_value(Value val) {
     printf("%g", AS_NUMBER(val));
   } else if (IS_NONE(val)) {
     printf("None");
+  } else if (IS_NOTHING(val)) {
+    // only used in debug mode.
+    printf("<Nothing>");
   } else {
     UNREACHABLE("print: unknown value type");
   }

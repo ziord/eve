@@ -4,6 +4,11 @@
 #include "src/debug.h"
 #include "src/vm.h"
 
+void cleanup(Parser* parser, char* src) {
+  free_parser(parser);
+  free(src);
+}
+
 int execute(char* fp) {
   Code code;
   init_code(&code);
@@ -13,12 +18,16 @@ int execute(char* fp) {
   Parser parser = new_parser(src, fp);
   AstNode* root = parse(&parser);
   if (parser.errors) {
-    free_parser(&parser);
+    cleanup(&parser, src);
     return RESULT_COMPILE_ERROR;
   }
   // compile
   Compiler compiler = new_compiler(root, &code, &vm);
   compile(&compiler);
+  if (compiler.errors) {
+    cleanup(&parser, src);
+    return RESULT_COMPILE_ERROR;
+  }
   dis_code(&code, "test");
   free_parser(&parser);
   // run

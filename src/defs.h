@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define BYTE_MAX UINT8_MAX
+#define CONST_MAX UINT8_MAX
 #define CAST(ty, val) ((ty)(val))
 #define DEBUG_EXECUTION
 typedef struct VM VM;

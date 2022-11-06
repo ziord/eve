@@ -45,6 +45,7 @@ typedef enum {
   AST_EXPR_STMT,
   AST_SHOW_STMT,
   AST_ASSERT_STMT,
+  AST_BLOCK_STMT,
   AST_VAR_DECL,
   AST_PROGRAM,
 } AstTy;
@@ -69,14 +70,14 @@ typedef struct {
   AstTy type;
   int line;
   int len;
-  AstNode* elems[BYTE_MAX];
+  AstNode* elems[CONST_MAX];
 } ListNode;
 
 typedef struct {
   AstTy type;
   int line;
   int length;
-  AstNode* items[BYTE_MAX][2];  // key-value pairs
+  AstNode* items[CONST_MAX][2];  // key-value pairs
 } MapNode;
 
 typedef struct {
@@ -128,8 +129,14 @@ typedef struct {
   AstTy type;
   int line;
   int length;
-  AstNode* items[BYTE_MAX];
+  AstNode* items[CONST_MAX];
 } ShowStmtNode;
+
+typedef struct {
+  AstTy type;
+  int line;
+  Vec stmts;
+} BlockStmtNode;
 
 typedef struct {
   AstTy type;
@@ -155,6 +162,7 @@ union AstNode {
   ExprStmtNode expr_stmt;
   ShowStmtNode show_stmt;
   AssertStmtNode assert_stmt;
+  BlockStmtNode block_stmt;
   SubscriptNode subscript;
   ProgramNode program;
 };

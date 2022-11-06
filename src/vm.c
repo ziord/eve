@@ -73,14 +73,16 @@ void boot_vm(VM* vm, Code* code) {
   vm->sp = vm->stack;
   vm->objects = NULL;
   vm->bytes_alloc = 0;
-  hashmap_init(&vm->globals);
   // assumes that 'strings' hashmap has been initialized already by the compiler
+  hashmap_init(&vm->globals);
+  // TODO: push function object instead of NOTHING
+  push_stack(vm, NOTHING_VAL);
 }
 
 static IResult runtime_error(VM* vm, char* fmt, ...) {
   va_list ap;
-  va_start(ap, fmt);
   fputs("Runtime Error: ", stderr);
+  va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
   va_end(ap);
   return RESULT_RUNTIME_ERROR;
@@ -213,6 +215,10 @@ IResult run(VM* vm) {
         }
         break;
       }
+      case $GET_LOCAL: {
+        push_stack(vm, vm->stack[READ_BYTE(vm)]);
+        break;
+      }
       case $SET_GLOBAL: {
         Value var = READ_CONST(vm);
         if (hashmap_put(&vm->globals, vm, var, PEEK_STACK(vm))) {
@@ -224,6 +230,10 @@ IResult run(VM* vm) {
               "use of undefined variable '%s'",
               str->str);
         }
+        break;
+      }
+      case $SET_LOCAL: {
+        vm->stack[READ_BYTE(vm)] = PEEK_STACK(vm);
         break;
       }
       case $SET_SUBSCRIPT: {
@@ -317,6 +327,10 @@ IResult run(VM* vm) {
       }
       case $POP: {
         pop_stack(vm);
+        break;
+      }
+      case $POP_N: {
+        vm->sp -= READ_BYTE(vm);
         break;
       }
       case $SUBSCRIPT: {

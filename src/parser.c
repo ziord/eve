@@ -52,6 +52,7 @@ static AstNode*
 parse_subscript(Parser* parser, AstNode* left, bool assignable);
 static AstNode* parse_var(Parser* parser, bool assignable);
 static AstNode* parse_decls(Parser* parser);
+static AstNode* parse_stmt(Parser* parser);
 
 // clang-format off
 ExprParseTable p_table[] = {
@@ -93,6 +94,9 @@ ExprParseTable p_table[] = {
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_SHOW] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LET] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_IF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_ELSE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_ASSERT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_IDENT] = {.bp = BP_NONE, .prefix = parse_var, .infix = NULL},
   [TK_STRING] = {.bp = BP_NONE, .prefix = parse_string, .infix = NULL},
   [TK_EOF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -508,7 +512,7 @@ static AstNode* parse_expr_stmt(Parser* parser) {
 }
 
 static AstNode* parse_show_stmt(Parser* parser) {
-  advance(parser);  // skip token 'show'
+  consume(parser, TK_SHOW);
   AstNode* stmt = new_node(parser);
   ShowStmtNode* show_stmt = &stmt->show_stmt;
   show_stmt->line = parser->previous_tk.line;
@@ -530,7 +534,7 @@ static AstNode* parse_show_stmt(Parser* parser) {
 
 static AstNode* parse_assert_stmt(Parser* parser) {
   Token tok = parser->current_tk;
-  advance(parser);  // skip token 'assert'
+  consume(parser, TK_ASSERT);
   AstNode* stmt = new_node(parser);
   AstNode* test = parse_expr(parser);
   AstNode* msg = NULL;
@@ -556,7 +560,7 @@ static AstNode* parse_assert_stmt(Parser* parser) {
 }
 
 static AstNode* parse_block_stmt(Parser* parser) {
-  advance(parser);  // skip '{' token
+  consume(parser, TK_LCURLY);
   AstNode* node = new_node(parser);
   node->block_stmt = (BlockStmtNode) {
       .type = AST_BLOCK_STMT,
@@ -565,20 +569,62 @@ static AstNode* parse_block_stmt(Parser* parser) {
   vec_init(&block->stmts);
   while (!is_tty(parser, TK_RCURLY) && !is_tty(parser, TK_EOF)) {
     vec_push(&block->stmts, parse_decls(parser));
+    if (parser->panicking)
+      break;
   }
   consume(parser, TK_RCURLY);
   return node;
 }
 
-static AstNode* parse_stmt(Parser* parser) {
-  if (is_tty(parser, TK_SHOW)) {
-    return parse_show_stmt(parser);
-  } else if (is_tty(parser, TK_ASSERT)) {
-    return parse_assert_stmt(parser);
-  } else if (is_tty(parser, TK_LCURLY)) {
-    return parse_block_stmt(parser);
+static AstNode* parse_if_stmt(Parser* parser) {
+  /*
+   * if cond {
+   *  stmt
+   * } else {
+   *  stmt
+   * }
+   */
+  consume(parser, TK_IF);
+  int line = parser->previous_tk.line;
+  AstNode* cond = parse_expr(parser);
+  AstNode* if_block = parse_block_stmt(parser);
+  AstNode* else_block;
+  if (match(parser, TK_ELSE)) {
+    // only '{' or 'if' token can succeed an 'else' token
+    if (is_tty(parser, TK_IF)) {
+      else_block = parse_stmt(parser);
+    } else {
+      else_block = parse_block_stmt(parser);
+    }
+  } else {
+    else_block = new_node(parser);
+    else_block->block_stmt.type = AST_BLOCK_STMT;
+    else_block->block_stmt.line = parser->previous_tk.line;
+    vec_init(&else_block->block_stmt.stmts);
   }
-  return parse_expr_stmt(parser);
+  AstNode* node = new_node(parser);
+  node->ife_stmt = (IfElseStmtNode) {
+      .type = AST_IF_STMT,
+      .condition = cond,
+      .if_block = if_block,
+      .else_block = else_block,
+      .line = line};
+  return node;
+}
+
+static AstNode* parse_stmt(Parser* parser) {
+  switch (parser->current_tk.ty) {
+    case TK_SHOW:
+      return parse_show_stmt(parser);
+    case TK_ASSERT:
+      return parse_assert_stmt(parser);
+    case TK_LCURLY:
+      return parse_block_stmt(parser);
+    case TK_IF:
+      return parse_if_stmt(parser);
+    default:
+      return parse_expr_stmt(parser);
+  }
 }
 
 static AstNode* parse_var_decl(Parser* parser) {
@@ -624,6 +670,7 @@ void resync(Parser* parser) {
       case TK_LET:
       case TK_SHOW:
       case TK_ASSERT:
+      case TK_IF:
       case TK_EOF:
         return;
       default:

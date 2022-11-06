@@ -1,0 +1,84 @@
+let x = 5;
+if x % 2 > 0 {
+    x *= x;
+} else {
+    x /= x;
+}
+
+assert x == 25;
+
+if true {
+    let x = 10;
+    let y = 5;
+} else {
+    let x = 12;
+}
+
+assert x == 25;
+let y = x >> 2;
+{
+ let x = None;
+ if !x && y > 5 {
+    y += x || 0xface;
+ } else {
+    y = None;
+ }
+}
+assert y && y == 0xfad4;
+assert x == 25;
+
+if 0 || 0xff {
+    assert true;
+} else {
+    assert false;
+}
+
+if (0 && 0xff) || None || false || !true || !!!x {
+    assert false;
+} else {
+    assert true;
+}
+
+if 0 && 0xff && None && false && !true && !!!x {
+    assert false;
+} else {
+    assert true;
+}
+if true { } x;
+if false {} x;
+if true {
+ if true {
+   if true {
+     assert 1;
+   }
+   let x = 10;
+   assert x == 10;
+ }
+ assert x == 25;
+}
+assert x == 25;
+if false {
+    None;
+} else {
+   if false {
+     None;
+   } else {
+     if false {
+        None;
+     } else {
+       assert !false;
+     }
+   }
+}
+
+if false { assert false;} else if true { assert true; }
+
+if false {
+    show false;
+} else if true {
+    assert true;
+} else if 1 {
+    assert 1;
+} else {
+    assert false;
+}

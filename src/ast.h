@@ -46,6 +46,7 @@ typedef enum {
   AST_SHOW_STMT,
   AST_ASSERT_STMT,
   AST_BLOCK_STMT,
+  AST_IF_STMT,
   AST_VAR_DECL,
   AST_PROGRAM,
 } AstTy;
@@ -141,6 +142,14 @@ typedef struct {
 typedef struct {
   AstTy type;
   int line;
+  AstNode* condition;
+  AstNode* if_block;
+  AstNode* else_block;
+} IfElseStmtNode;
+
+typedef struct {
+  AstTy type;
+  int line;
   int len;
   char* name;
 } VarNode;
@@ -159,11 +168,12 @@ union AstNode {
   ListNode list;
   MapNode map;
   VarNode var;
+  SubscriptNode subscript;
   ExprStmtNode expr_stmt;
   ShowStmtNode show_stmt;
   AssertStmtNode assert_stmt;
   BlockStmtNode block_stmt;
-  SubscriptNode subscript;
+  IfElseStmtNode ife_stmt;
   ProgramNode program;
 };
 

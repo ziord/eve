@@ -194,6 +194,7 @@ void c_or(Compiler* compiler, BinaryNode* node) {
   int skip_jmp_idx = emit_jump(compiler, $JMP_FALSE, node->line);
   int end_jmp_idx = emit_jump(compiler, $JMP, node->line);
   patch_jump(compiler, skip_jmp_idx);
+  emit_byte(compiler, $POP, node->line);
   c_(compiler, node->r_node);
   patch_jump(compiler, end_jmp_idx);
 }
@@ -319,6 +320,19 @@ void c_block_stmt(Compiler* compiler, AstNode* node) {
   pop_locals(compiler, line);
 }
 
+void c_if_stmt(Compiler* compiler, AstNode* node) {
+  IfElseStmtNode* ife = CAST(IfElseStmtNode*, node);
+  c_(compiler, ife->condition);
+  int else_slot = emit_jump(compiler, $JMP_FALSE_OR_POP, ife->line);
+  c_(compiler, ife->if_block);
+  int end_slot = emit_jump(compiler, $JMP, ife->line);
+  patch_jump(compiler, else_slot);
+  // pop if-condition when in else block
+  emit_byte(compiler, $POP, ife->line);
+  c_(compiler, ife->else_block);
+  patch_jump(compiler, end_slot);
+}
+
 void c_program(Compiler* compiler, AstNode* node) {
   ProgramNode* program = CAST(ProgramNode*, node);
   for (int i = 0; i < vec_size(&program->decls); i++) {
@@ -373,6 +387,9 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_BLOCK_STMT:
       c_block_stmt(compiler, node);
+      break;
+    case AST_IF_STMT:
+      c_if_stmt(compiler, node);
       break;
     case AST_PROGRAM:
       c_program(compiler, node);

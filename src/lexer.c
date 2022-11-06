@@ -24,6 +24,8 @@ char* token_types[] = {
     [TK_SHOW] = "show",       [TK_IDENT] = "<identifier>",
     [TK_STRING] = "<string>", [TK_EOF] = "<eof>",
     [TK_ERROR] = "<error>",   [TK_LET] = "let",
+    [TK_ASSERT] = "assert",   [TK_IF] = "if",
+    [TK_ELSE] = "else",
 };
 
 void init_lexer(Lexer* lexer, char* src) {
@@ -228,7 +230,9 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
     case 'w':
     case 'r':
     case 'i':
+      return expect(lexer, "f", 1, 1, TK_IF);
     case 'e':
+      return expect(lexer, "lse", 1, 3, TK_ELSE);
     case 'l':
       return expect(lexer, "et", 1, 2, TK_LET);
     default:

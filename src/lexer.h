@@ -49,6 +49,9 @@ typedef enum {
   TK_ASSERT,        // assert
   TK_IF,            // if
   TK_ELSE,          // else
+  TK_WHILE,         // while
+  TK_BREAK,         // break
+  TK_CONTINUE,      // continue
   TK_IDENT,         // identifier
   TK_STRING,        // "..."
   TK_EOF,           // EOF

@@ -30,6 +30,11 @@ OpCode op_table[][2] = {
 
 void c_(Compiler* compiler, AstNode* node);
 static void reserve_local(Compiler* compiler);
+void c_control(
+    Compiler* compiler,
+    ControlStmtNode* node,
+    int continue_exit,
+    int break_exit);
 
 Compiler new_compiler(AstNode* node, Code* code, VM* vm) {
   Compiler compiler = {
@@ -38,12 +43,14 @@ Compiler new_compiler(AstNode* node, Code* code, VM* vm) {
       .vm = vm,
       .scope = 0,
       .locals_count = 0,
-      .errors = 0};
+      .controls_count = 0,
+      .errors = 0,
+      .current_loop = {.scope = -1}};
   reserve_local(&compiler);
   return compiler;
 }
 
-static void compile_error(Compiler* compiler, char* fmt, ...) {
+void compile_error(Compiler* compiler, char* fmt, ...) {
   if (compiler->errors > 1) {
     fputc('\n', stderr);
   }
@@ -67,7 +74,7 @@ static int store_variable(Compiler* compiler, VarNode* var) {
 }
 
 inline static void reserve_local(Compiler* compiler) {
-  LVar* local_var = &compiler->locals[compiler->locals_count++];
+  LocalVar* local_var = &compiler->locals[compiler->locals_count++];
   local_var->name_len = 0;
   local_var->name = "";
   local_var->initialized = false;
@@ -75,7 +82,7 @@ inline static void reserve_local(Compiler* compiler) {
 }
 
 inline static int add_lvar(Compiler* compiler, VarNode* node) {
-  LVar* var = &compiler->locals[compiler->locals_count++];
+  LocalVar* var = &compiler->locals[compiler->locals_count++];
   var->scope = compiler->scope;
   var->name = node->name;
   var->name_len = node->len;
@@ -84,7 +91,7 @@ inline static int add_lvar(Compiler* compiler, VarNode* node) {
 }
 
 inline static int find_lvar(Compiler* compiler, VarNode* node) {
-  LVar* var;
+  LocalVar* var;
   // we start at the latest lvar - to ensure lexical scoping correctness
   for (int i = compiler->locals_count - 1; i >= 0; i--) {
     var = &compiler->locals[i];
@@ -117,6 +124,33 @@ inline static void pop_locals(Compiler* compiler, int line) {
     }
     compiler->locals_count -= pops;
   }
+}
+
+void push_loop_ctrl(Compiler* compiler, ControlStmtNode* node) {
+  ASSERT_MAX(
+      compiler,
+      compiler->controls_count,
+      MAX_CONTROLS,
+      "Maximum number of break/continue exceeded: %d",
+      MAX_CONTROLS);
+  compiler->controls[compiler->controls_count++] =
+      (LoopVar) {.scope = compiler->current_loop.scope, .node = node};
+}
+
+void process_loop_control(
+    Compiler* compiler,
+    int continue_exit,
+    int break_exit) {
+  LoopVar* var;
+  int j = 0;
+  for (int i = compiler->controls_count - 1; i >= 0; i--) {
+    var = &compiler->controls[i];
+    if (var->scope == compiler->current_loop.scope) {
+      c_control(compiler, var->node, continue_exit, break_exit);
+      j++;
+    }
+  }
+  compiler->controls_count -= j;
 }
 
 void c_num(Compiler* compiler, AstNode* node) {
@@ -244,7 +278,7 @@ void c_var(Compiler* compiler, AstNode* node) {
   int index;
   if ((index = find_lvar(compiler, var)) != -1) {
     // check if the local is initialized, i.e. prevent things like: let a = a;
-    LVar* lvar = &compiler->locals[index];
+    LocalVar* lvar = &compiler->locals[index];
     if (!lvar->initialized) {
       return compile_error(
           compiler,
@@ -314,10 +348,8 @@ void c_block_stmt(Compiler* compiler, AstNode* node) {
   }
   compiler->scope--;
   // use the last node's line if available, else the block's line
-  int line = compiler->code->length
-      ? compiler->code->lines[compiler->code->length - 1]
-      : block->line;
-  pop_locals(compiler, line);
+  int line = last_line(compiler);
+  pop_locals(compiler, line != -1 ? line : block->line);
 }
 
 void c_if_stmt(Compiler* compiler, AstNode* node) {
@@ -325,12 +357,77 @@ void c_if_stmt(Compiler* compiler, AstNode* node) {
   c_(compiler, ife->condition);
   int else_slot = emit_jump(compiler, $JMP_FALSE_OR_POP, ife->line);
   c_(compiler, ife->if_block);
-  int end_slot = emit_jump(compiler, $JMP, ife->line);
+  int end_slot = emit_jump(compiler, $JMP, last_line(compiler));
   patch_jump(compiler, else_slot);
   // pop if-condition when in else block
-  emit_byte(compiler, $POP, ife->line);
+  emit_byte(compiler, $POP, last_line(compiler));
   c_(compiler, ife->else_block);
   patch_jump(compiler, end_slot);
+}
+
+void c_control(
+    Compiler* compiler,
+    ControlStmtNode* node,
+    int continue_exit,
+    int break_exit) {
+  Code* code = compiler->code;
+  int slot = node->patch_slot;
+  int offset;
+  if (node->is_break) {
+    offset = (break_exit - slot - 3);
+    code->bytes[slot] = $JMP;
+    code->bytes[slot + 1] = (offset >> 8) & 0xff;
+    code->bytes[slot + 2] = offset & 0xff;
+  } else {
+    offset = (slot - continue_exit + 3);
+    code->bytes[slot] = $LOOP;
+    code->bytes[slot + 1] = (offset >> 8) & 0xff;
+    code->bytes[slot + 2] = offset & 0xff;
+  }
+}
+
+void c_control_stmt(Compiler* compiler, AstNode* node) {
+  /*
+   * <-> continue_point
+   * while false {
+   *   break;
+   *   continue;
+   * }
+   * <-> break_point
+   */
+  int pops = 0;
+  for (int i = compiler->locals_count - 1; i >= 0; i--) {
+    if (compiler->locals[i].scope > compiler->current_loop.scope) {
+      pops++;
+    }
+  }
+  int line = node->control_stmt.line;
+  // pop locals (if any) before exiting the loop via break or continue
+  if (pops) {
+    emit_byte(compiler, $POP_N, line);
+    emit_byte(compiler, (byte_t)pops, line);
+  }
+  // use the next slot offset which would later contain the jump instruction
+  node->control_stmt.patch_slot = compiler->code->length;
+  emit_jump(compiler, 0xff, line);  // fill with a fake instruction for now
+  push_loop_ctrl(compiler, &node->control_stmt);
+}
+
+void c_while_stmt(Compiler* compiler, AstNode* node) {
+  WhileStmtNode* wh_node = CAST(WhileStmtNode*, node);
+  LoopVar curr = compiler->current_loop;
+  compiler->current_loop = (LoopVar) {.scope = compiler->scope};
+  int continue_exit = compiler->code->length;
+  c_(compiler, wh_node->condition);
+  int end_slot = emit_jump(compiler, $JMP_FALSE_OR_POP, wh_node->line);
+  c_(compiler, wh_node->block);
+  emit_loop(compiler, continue_exit, last_line(compiler));
+  patch_jump(compiler, end_slot);
+  // pop loop condition off the stack
+  emit_byte(compiler, $POP, last_line(compiler));
+  int break_exit = compiler->code->length;
+  process_loop_control(compiler, continue_exit, break_exit);
+  compiler->current_loop = curr;
 }
 
 void c_program(Compiler* compiler, AstNode* node) {
@@ -390,6 +487,12 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_IF_STMT:
       c_if_stmt(compiler, node);
+      break;
+    case AST_WHILE_STMT:
+      c_while_stmt(compiler, node);
+      break;
+    case AST_CONTROL_STMT:
+      c_control_stmt(compiler, node);
       break;
     case AST_PROGRAM:
       c_program(compiler, node);

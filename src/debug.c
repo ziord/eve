@@ -97,6 +97,8 @@ int dis_instruction(Code* code, int index) {
       return jump_instruction("$JMP_FALSE", code, index, 1);
     case $JMP_FALSE_OR_POP:
       return jump_instruction("$JMP_FALSE_OR_POP", code, index, 1);
+    case $LOOP:
+      return jump_instruction("$LOOP", code, index, -1);
     case $BUILD_LIST:
       return byte_instruction("$BUILD_LIST", code, index);
     case $BUILD_MAP:

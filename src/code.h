@@ -46,6 +46,7 @@ typedef enum {
   $SET_GLOBAL,
   $SET_LOCAL,
   $ASSERT,
+  $LOOP,
   $RET
 } OpCode;
 typedef struct {

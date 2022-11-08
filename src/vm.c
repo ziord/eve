@@ -385,6 +385,11 @@ IResult run(VM* vm) {
         }
         break;
       }
+      case $LOOP: {
+        uint16_t offset = READ_SHORT(vm);
+        vm->ip -= offset;
+        break;
+      }
       case $BUILD_LIST: {
         ObjList* list = create_list(vm, READ_BYTE(vm));
         for (int i = 0; i < list->elems.length; i++) {

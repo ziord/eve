@@ -25,7 +25,8 @@ char* token_types[] = {
     [TK_STRING] = "<string>", [TK_EOF] = "<eof>",
     [TK_ERROR] = "<error>",   [TK_LET] = "let",
     [TK_ASSERT] = "assert",   [TK_IF] = "if",
-    [TK_ELSE] = "else",
+    [TK_ELSE] = "else",       [TK_WHILE] = "while",
+    [TK_BREAK] = "break",     [TK_CONTINUE] = "continue",
 };
 
 void init_lexer(Lexer* lexer, char* src) {
@@ -208,11 +209,15 @@ Token lex_num(Lexer* lexer, char start) {
 
 TokenTy keyword_type(Lexer* lexer, char ch) {
   // keywords:
-  // true, false, None, struct, while,
-  // return, if, else, fn, let, show
+  // true, false, None, struct, while, break,
+  // return, if, else, fn, let, show, continue
   switch (ch) {
     case 'a':
       return expect(lexer, "ssert", 1, 5, TK_ASSERT);
+    case 'b':
+      return expect(lexer, "reak", 1, 4, TK_BREAK);
+    case 'c':
+      return expect(lexer, "ontinue", 1, 7, TK_CONTINUE);
     case 't':
       return expect(lexer, "rue", 1, 3, TK_TRUE);
     case 'f':
@@ -228,6 +233,7 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
           return expect(lexer, "ow", 2, 2, TK_SHOW);
       }
     case 'w':
+      return expect(lexer, "hile", 1, 4, TK_WHILE);
     case 'r':
     case 'i':
       return expect(lexer, "f", 1, 1, TK_IF);

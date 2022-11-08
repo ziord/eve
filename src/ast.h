@@ -47,6 +47,8 @@ typedef enum {
   AST_ASSERT_STMT,
   AST_BLOCK_STMT,
   AST_IF_STMT,
+  AST_WHILE_STMT,
+  AST_CONTROL_STMT,
   AST_VAR_DECL,
   AST_PROGRAM,
 } AstTy;
@@ -156,6 +158,21 @@ typedef struct {
 
 typedef struct {
   AstTy type;
+  int line;
+  int patch_slot;
+  bool is_continue;
+  bool is_break;
+} ControlStmtNode;
+
+typedef struct {
+  AstTy type;
+  int line;
+  AstNode* condition;
+  AstNode* block;
+} WhileStmtNode;
+
+typedef struct {
+  AstTy type;
   Vec decls;
 } ProgramNode;
 
@@ -174,6 +191,8 @@ union AstNode {
   AssertStmtNode assert_stmt;
   BlockStmtNode block_stmt;
   IfElseStmtNode ife_stmt;
+  WhileStmtNode while_stmt;
+  ControlStmtNode control_stmt;
   ProgramNode program;
 };
 

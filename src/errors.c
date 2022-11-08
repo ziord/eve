@@ -10,7 +10,7 @@ Error error_types[] = {
   [E0003] = {.err_msg = "Unknown token type", .hlp_msg = "The token found at this position was not recognized"},
   [E0004] = {.err_msg = "Token type mismatch", .hlp_msg = "Expected token type '%s', but got '%s'"},
   [E0005] = {.err_msg = "Invalid token for prefix: '%s'", .hlp_msg = "The token was found at an unexpected position"},
-  [E0006] = {.err_msg = "", .hlp_msg = NULL}, // TODO: reuse
+  [E0006] = {.err_msg = "Cannot use '%s' outside a loop statement", .hlp_msg = "Consider eliminating the statement"},
   [E0007] = {.err_msg = "Maximum number of elements for list exceeded.", .hlp_msg = "Max allowed is %d"},
   [E0008] = {.err_msg = "", .hlp_msg = ""}, // TODO: reuse
   [E0009] = {.err_msg = "Maximum number of items for map exceeded.", .hlp_msg = "Max allowed is %d"},

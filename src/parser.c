@@ -97,6 +97,9 @@ ExprParseTable p_table[] = {
   [TK_IF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ELSE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ASSERT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_WHILE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_CONTINUE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_BREAK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_IDENT] = {.bp = BP_NONE, .prefix = parse_var, .infix = NULL},
   [TK_STRING] = {.bp = BP_NONE, .prefix = parse_string, .infix = NULL},
   [TK_EOF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -116,8 +119,12 @@ static void advance(Parser* parser);
 Parser new_parser(char* src, const char* fp) {
   Lexer lexer;
   init_lexer(&lexer, src);
-  Parser parser =
-      {.lexer = lexer, .file_path = fp, .errors = 0, .panicking = false};
+  Parser parser = {
+      .lexer = lexer,
+      .file_path = fp,
+      .errors = 0,
+      .panicking = false,
+      .loop = 0};
   init_store(&parser.store);
   return parser;
 }
@@ -157,19 +164,19 @@ void display_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
                        : error.err_msg;
   parser->file_path ? fprintf(stderr, "~ %s ~\n", parser->file_path)
                     : (void)0;
-  fprintf(
-      stderr,
-      "%4d |[E%04d]%s%s\n",
-      token.line,
-      ty,
-      warning_msg,
-      err_msg);
-  int squi_padding, src_len;
+  fprintf(stderr, "%4s [E%04d]%s%s\n", " ", ty, warning_msg, err_msg);
+  int squi_padding, src_len,
+      squi_len = token.length <= 0 ? 1 : token.length;
   char* src =
       get_src_at_line(&parser->lexer, token, &squi_padding, &src_len);
   squi_padding = abs(squi_padding);
-  int squi_len = token.length <= 0 ? 1 : token.length;
-  fprintf(stderr, "%6s %.*s\n", "|", src_len, src);
+  if (squi_padding > src_len) {
+    squi_padding = src_len;
+  }
+  if (squi_len > src_len) {
+    squi_len = 1;
+  }
+  fprintf(stderr, "%4d %s %.*s\n", token.line, "|", src_len, src);
   fprintf(stderr, "%6s ", "|");
   for (int i = 0; i < squi_padding; i++)
     fputc(' ', stderr);
@@ -612,6 +619,51 @@ static AstNode* parse_if_stmt(Parser* parser) {
   return node;
 }
 
+static AstNode* parse_control_stmt(Parser* parser) {
+  if (!parser->loop) {
+    CREATE_BUFFER(
+        buff,
+        error_types[E0006].err_msg,
+        token_types[parser->current_tk.ty]);
+    ErrorArgs args = new_error_arg(NULL, buff, NULL);
+    return parse_error(parser, E0006, &args);
+  }
+  bool is_break = match(parser, TK_BREAK);
+  bool is_continue = !is_break && match(parser, TK_CONTINUE);
+  ASSERT(
+      is_break || is_continue,
+      "loop control should be 'break' or 'continue'");
+  AstNode* node = new_node(parser);
+  node->control_stmt = (ControlStmtNode) {
+      .type = AST_CONTROL_STMT,
+      .is_continue = is_continue,
+      .is_break = is_break,
+      .line = parser->previous_tk.line};
+  consume(parser, TK_SEMI_COLON);
+  return node;
+}
+
+static AstNode* parse_while_stmt(Parser* parser) {
+  /*
+   * while cond {
+   *  stmt
+   * }
+   */
+  parser->loop++;
+  consume(parser, TK_WHILE);
+  int line = parser->previous_tk.line;
+  AstNode* cond = parse_expr(parser);
+  AstNode* block = parse_block_stmt(parser);
+  AstNode* node = new_node(parser);
+  node->while_stmt = (WhileStmtNode) {
+      .type = AST_WHILE_STMT,
+      .condition = cond,
+      .block = block,
+      .line = line};
+  parser->loop--;
+  return node;
+}
+
 static AstNode* parse_stmt(Parser* parser) {
   switch (parser->current_tk.ty) {
     case TK_SHOW:
@@ -622,6 +674,11 @@ static AstNode* parse_stmt(Parser* parser) {
       return parse_block_stmt(parser);
     case TK_IF:
       return parse_if_stmt(parser);
+    case TK_WHILE:
+      return parse_while_stmt(parser);
+    case TK_BREAK:
+    case TK_CONTINUE:
+      return parse_control_stmt(parser);
     default:
       return parse_expr_stmt(parser);
   }
@@ -665,13 +722,13 @@ static AstNode* parse_var(Parser* parser, bool assignable) {
 
 void resync(Parser* parser) {
   parser->panicking = false;
-  for (;;) {
+  while (!is_tty(parser, TK_EOF)) {
     switch (parser->current_tk.ty) {
       case TK_LET:
       case TK_SHOW:
       case TK_ASSERT:
+      case TK_WHILE:
       case TK_IF:
-      case TK_EOF:
         return;
       default:
         advance(parser);

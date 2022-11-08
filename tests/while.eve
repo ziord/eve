@@ -1,0 +1,88 @@
+let x = 0;
+let y = 0;
+while x < 10 {
+    x += 1;
+    if x > 5 {
+        break;
+    }
+    while y < x {
+        y += 2;
+        if y >= x {
+            break;
+        }
+    }
+    ## show y;
+}
+assert x == y;
+
+let a = 0;
+while true {
+    while true {
+        a += 1;
+        if a < 500 {
+            continue;
+        } else {
+            break;
+        }
+    }
+    break;
+}
+assert a == 500;
+
+let a = 0;
+while a < 10 {
+    let x = 0;
+    while x < 10 {
+        x += 1;
+        continue;
+    }
+    show "x is:", x;
+    let y = 5;
+    while y < 15 {
+        let k = 10;
+        let k2 = 0x10;
+        let k3 = 10.3e5;
+        let k4 = 10.e3;
+        let k5 = 10.e-3;
+        y += 1;
+        continue;
+    }
+    assert y == 15;
+    while y < 15 || y == 15 {
+        let k = 10;
+        let k2 = 0x10;
+        let k3 = 10.3e5;
+        let k4 = 10.e3;
+        let k5 = 10.e-3;
+        y += 1;
+        break;
+    }
+    assert y == 16;
+    ## show "y is:", y;
+    a += 1;
+}
+
+assert x == y;
+assert x == 6;
+
+while true {
+    while true {
+        while true {
+            while true {
+                while true {
+                    x += y;
+                    break;
+                }
+                x += y;
+                break;
+            }
+            x += y;
+            break;
+        }
+        x += y;
+        break;
+    }
+    x += y;
+    break;
+}
+assert x == 36;

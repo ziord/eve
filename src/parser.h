@@ -12,6 +12,7 @@ typedef struct {
   Lexer lexer;
   bool panicking;
   int errors;
+  int loop;
   const char* file_path;
   NodeStore store;
 } Parser;

@@ -49,7 +49,7 @@ typedef enum {
   $LOOP,
   $RET
 } OpCode;
-typedef struct {
+typedef struct Code {
   int length;
   int capacity;
   int* lines;

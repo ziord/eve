@@ -60,7 +60,11 @@ void print_object(Value val, Obj* obj) {
       ObjList* list = AS_LIST(val);
       printf("[");
       for (int i = 0; i < list->elems.length; i++) {
-        print_value(list->elems.buffer[i]);
+        if (list->elems.buffer[i] != val) {
+          print_value(list->elems.buffer[i]);
+        } else {
+          printf("[...]");
+        }
         if (i < list->elems.length - 1) {
           printf(", ");
         }
@@ -81,7 +85,11 @@ void print_object(Value val, Obj* obj) {
           }
           print_value(entry->key);
           printf(": ");
-          print_value(entry->value);
+          if (entry->value != val) {
+            print_value(entry->value);
+          } else {
+            printf("#{...}");
+          }
           if (j < map->length - 1) {
             printf(", ");
           }

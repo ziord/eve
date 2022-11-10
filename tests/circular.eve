@@ -1,0 +1,13 @@
+let x = [1, 2];
+x[-1] = x;
+show x, x[-1];
+assert x[1] == x;
+
+let y = #{"a": 5};
+y["b"] = y;
+show y, y["b"];
+assert y == y["b"];
+
+let z = [x, y];
+show z;
+assert z;

@@ -3,10 +3,11 @@
 
 #include <math.h>
 
-#include "code.h"
 #include "debug.h"
 #include "util.h"
-#define STACK_MAX 0xfff
+
+#define FRAME_MAX (0x50)
+#define STACK_MAX ((FRAME_MAX) * (CONST_MAX))
 
 typedef enum {
   RESULT_SUCCESS = 0,  // successful run
@@ -14,19 +15,27 @@ typedef enum {
   RESULT_RUNTIME_ERROR,  // runtime error
 } IResult;
 
-typedef struct VM {
+typedef struct {
   byte_t* ip;
-  Code* code;
-  Value stack[STACK_MAX];
-  Value* sp;
-  Obj* objects;
+  ObjFn* func;
+  Value* stack;
+} CallFrame;
+
+typedef struct VM {
+  int frame_count;
   size_t bytes_alloc;
   ObjHashMap strings;
   ObjHashMap globals;
+  Value stack[STACK_MAX];
+  CallFrame frames[FRAME_MAX];
+  CallFrame* fp;
+  Value* sp;
+  Obj* objects;
 } VM;
 
 VM new_vm();
-void boot_vm(VM* vm, Code* code);
+void free_vm(VM* vm);
+void boot_vm(VM* vm, ObjFn* func);
 IResult run(VM* vm);
 
 #endif  //EVE_VM_H

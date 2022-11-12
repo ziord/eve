@@ -1,8 +1,9 @@
 #include "vm.h"
 
-#define READ_BYTE(vm) (*(vm->ip++))
-#define READ_SHORT(vm) (vm->ip += 2, ((vm->ip[-2]) << 8u) | (vm->ip[-1]))
-#define READ_CONST(vm) (vm->code->vpool.values[READ_BYTE(vm)])
+#define READ_BYTE(vm) (*(vm->fp->ip++))
+#define READ_SHORT(vm) \
+  (vm->fp->ip += 2, ((vm->fp->ip[-2]) << 8u) | (vm->fp->ip[-1]))
+#define READ_CONST(vm) (vm->fp->func->code.vpool.values[READ_BYTE(vm)])
 #define PEEK_STACK(vm) (*(vm->sp - 1))
 #define PEEK_STACK_AT(vm, n) (*(vm->sp - 1 - (n)))
 #define BINARY_OP(vm, _op, _val_func) \
@@ -41,6 +42,8 @@
         get_value_type((_a))); \
   }
 
+static IResult runtime_error(VM* vm, char* fmt, ...);
+
 inline static Value pop_stack(VM* vm) {
   return *(--vm->sp);
 }
@@ -48,6 +51,20 @@ inline static Value pop_stack(VM* vm) {
 inline static void push_stack(VM* vm, Value val) {
   *vm->sp = val;
   vm->sp++;
+}
+
+inline static bool push_frame(VM* vm, CallFrame frame) {
+  if (vm->frame_count >= FRAME_MAX) {
+    runtime_error(vm, "Stack overflow: too many call frames");
+    return false;
+  }
+  vm->fp = &vm->frames[vm->frame_count++];
+  *vm->fp = frame;
+  return true;
+}
+
+inline static CallFrame pop_frame(VM* vm) {
+  return *(vm->fp--);
 }
 
 inline static void print_stack(VM* vm) {
@@ -61,22 +78,35 @@ inline static void print_stack(VM* vm) {
 }
 
 VM new_vm() {
-  VM vm = {.code = NULL, .ip = NULL, .sp = NULL};
+  VM vm = {.fp = NULL, .objects = NULL, .sp = NULL, .frame_count = 0};
   hashmap_init(&vm.strings);
   hashmap_init(&vm.globals);
   return vm;
 }
 
-void boot_vm(VM* vm, Code* code) {
-  vm->code = code;
-  vm->ip = vm->code->bytes;
+void free_vm(VM* vm) {
+  if (vm->globals.entries) {
+    FREE(vm, vm->globals.entries, HashEntry);
+  }
+  if (vm->strings.entries) {
+    FREE(vm, vm->strings.entries, HashEntry);
+  }
+  Obj* next;
+  for (Obj* obj = vm->objects; obj != NULL; obj = next) {
+    next = obj->next;
+    free_object(vm, obj);
+  }
+}
+
+void boot_vm(VM* vm, ObjFn* func) {
+  vm->fp = vm->frames;
   vm->sp = vm->stack;
-  vm->objects = NULL;
   vm->bytes_alloc = 0;
   // assumes that 'strings' hashmap has been initialized already by the compiler
   hashmap_init(&vm->globals);
-  // TODO: push function object instead of NOTHING
-  push_stack(vm, NOTHING_VAL);
+  CallFrame frame = {.ip = func->code.bytes, .func = func, .stack = vm->sp};
+  push_frame(vm, frame);
+  push_stack(vm, OBJ_VAL(func));
 }
 
 static IResult runtime_error(VM* vm, char* fmt, ...) {
@@ -189,7 +219,9 @@ IResult run(VM* vm) {
   for (;;) {
 #if defined(DEBUG_EXECUTION)
     print_stack(vm);
-    dis_instruction(vm->code, (int)(vm->ip - vm->code->bytes));
+    dis_instruction(
+        &vm->fp->func->code,
+        (int)(vm->fp->ip - vm->fp->func->code.bytes));
 #endif
     inst = READ_BYTE(vm);
     switch (inst) {
@@ -366,20 +398,20 @@ IResult run(VM* vm) {
       }
       case $JMP: {
         uint16_t offset = READ_SHORT(vm);
-        vm->ip += offset;
+        vm->fp->ip += offset;
         break;
       }
       case $JMP_FALSE: {
         uint16_t offset = READ_SHORT(vm);
         if (value_falsy(PEEK_STACK(vm))) {
-          vm->ip += offset;
+          vm->fp->ip += offset;
         }
         break;
       }
       case $JMP_FALSE_OR_POP: {
         uint16_t offset = READ_SHORT(vm);
         if (value_falsy(PEEK_STACK(vm))) {
-          vm->ip += offset;
+          vm->fp->ip += offset;
         } else {
           pop_stack(vm);
         }
@@ -387,7 +419,7 @@ IResult run(VM* vm) {
       }
       case $LOOP: {
         uint16_t offset = READ_SHORT(vm);
-        vm->ip -= offset;
+        vm->fp->ip -= offset;
         break;
       }
       case $BUILD_LIST: {

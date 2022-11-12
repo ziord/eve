@@ -10,8 +10,6 @@ void cleanup(Parser* parser, char* src) {
 }
 
 int execute(char* fp) {
-  Code code;
-  init_code(&code);
   VM vm = new_vm();
   // parse
   char* src = read_file(fp);
@@ -22,20 +20,21 @@ int execute(char* fp) {
     return RESULT_COMPILE_ERROR;
   }
   // compile
-  Compiler compiler = new_compiler(root, &code, &vm);
+  ObjFn* func = create_function(&vm);
+  Compiler compiler = new_compiler(root, func, &vm);
   compile(&compiler);
   if (compiler.errors) {
     cleanup(&parser, src);
     return RESULT_COMPILE_ERROR;
   }
-  dis_code(&code, "test");
+  dis_code(&func->code, func->name ? func->name->str : "<>");
   free_parser(&parser);
   // run
-  boot_vm(&vm, &code);
+  boot_vm(&vm, func);
   IResult ret = run(&vm);
   // destruct
-  free_code(&code, &vm);
   free(src);
+  free_vm(&vm);
   return ret;
 }
 

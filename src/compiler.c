@@ -36,10 +36,10 @@ void c_control(
     int continue_exit,
     int break_exit);
 
-Compiler new_compiler(AstNode* node, Code* code, VM* vm) {
+Compiler new_compiler(AstNode* node, ObjFn* func, VM* vm) {
   Compiler compiler = {
       .root = node,
-      .code = code,
+      .func = func,
       .vm = vm,
       .scope = 0,
       .locals_count = 0,
@@ -69,7 +69,7 @@ static int store_variable(Compiler* compiler, VarNode* var) {
       var->name,
       var->len,
       false);
-  int slot = write_value(&compiler->code->vpool, val, compiler->vm);
+  int slot = write_value(&compiler->func->code.vpool, val, compiler->vm);
   return slot;
 }
 
@@ -312,7 +312,8 @@ void c_var_assign(Compiler* compiler, BinaryNode* assign) {
 void c_subscript_assign(Compiler* compiler, BinaryNode* assign) {
   c_(compiler, assign->r_node);
   c_(compiler, assign->l_node);
-  compiler->code->bytes[compiler->code->length - 1] = $SET_SUBSCRIPT;
+  compiler->func->code.bytes[compiler->func->code.length - 1] =
+      $SET_SUBSCRIPT;
 }
 
 void c_assign(Compiler* compiler, AstNode* node) {
@@ -370,7 +371,7 @@ void c_control(
     ControlStmtNode* node,
     int continue_exit,
     int break_exit) {
-  Code* code = compiler->code;
+  Code* code = &compiler->func->code;
   int slot = node->patch_slot;
   int offset;
   if (node->is_break) {
@@ -408,7 +409,7 @@ void c_control_stmt(Compiler* compiler, AstNode* node) {
     emit_byte(compiler, (byte_t)pops, line);
   }
   // use the next slot offset which would later contain the jump instruction
-  node->control_stmt.patch_slot = compiler->code->length;
+  node->control_stmt.patch_slot = compiler->func->code.length;
   emit_jump(compiler, 0xff, line);  // fill with a fake instruction for now
   push_loop_ctrl(compiler, &node->control_stmt);
 }
@@ -417,7 +418,7 @@ void c_while_stmt(Compiler* compiler, AstNode* node) {
   WhileStmtNode* wh_node = CAST(WhileStmtNode*, node);
   LoopVar curr = compiler->current_loop;
   compiler->current_loop = (LoopVar) {.scope = compiler->scope};
-  int continue_exit = compiler->code->length;
+  int continue_exit = compiler->func->code.length;
   c_(compiler, wh_node->condition);
   int end_slot = emit_jump(compiler, $JMP_FALSE_OR_POP, wh_node->line);
   c_(compiler, wh_node->block);
@@ -425,7 +426,7 @@ void c_while_stmt(Compiler* compiler, AstNode* node) {
   patch_jump(compiler, end_slot);
   // pop loop condition off the stack
   emit_byte(compiler, $POP, last_line(compiler));
-  int break_exit = compiler->code->length;
+  int break_exit = compiler->func->code.length;
   process_loop_control(compiler, continue_exit, break_exit);
   compiler->current_loop = curr;
 }
@@ -505,7 +506,7 @@ void c_(Compiler* compiler, AstNode* node) {
 void compile(Compiler* compiler) {
   c_(compiler, compiler->root);
   if (compiler->errors) {
-    free_code(compiler->code, compiler->vm);
+    free_code(&compiler->func->code, compiler->vm);
   }
   emit_byte(compiler, $RET, 100);
 }

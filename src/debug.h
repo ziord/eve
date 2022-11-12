@@ -1,6 +1,6 @@
 #ifndef EVE_DEBUG_H
 #define EVE_DEBUG_H
-#include "code.h"
+#include "value.h"
 
 int plain_instruction(char* inst, int offset);
 int constant_instruction(char* inst, Code* code, int offset);

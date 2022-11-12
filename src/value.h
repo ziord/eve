@@ -6,6 +6,7 @@
 
 #include "defs.h"
 #include "memory.h"
+#include "opcode.h"
 #include "util.h"
 
 typedef uint64_t Value;
@@ -43,10 +44,12 @@ typedef uint64_t Value;
 #define IS_STRING(val) (is_object_type(val, OBJ_STR))
 #define IS_LIST(val) (is_object_type(val, OBJ_LIST))
 #define IS_HMAP(val) (is_object_type(val, OBJ_HMAP))
+#define IS_FUNC(val) (is_object_type(val, OBJ_FN))
 
 #define AS_STRING(val) ((ObjString*)(AS_OBJ(val)))
 #define AS_LIST(val) ((ObjList*)(AS_OBJ(val)))
 #define AS_HMAP(val) ((ObjHashMap*)(AS_OBJ(val)))
+#define AS_FUNC(val) ((ObjFn*)(AS_OBJ(val)))
 
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
@@ -59,6 +62,14 @@ typedef struct {
   Value* values;
 } ValuePool;
 
+typedef struct Code {
+  int length;
+  int capacity;
+  int* lines;
+  byte_t* bytes;
+  ValuePool vpool;
+} Code;
+
 typedef struct {
   int length;
   int capacity;
@@ -69,6 +80,7 @@ typedef enum {
   OBJ_STR,
   OBJ_LIST,
   OBJ_HMAP,
+  OBJ_FN,
 } ObjTy;
 
 typedef struct Obj {
@@ -100,6 +112,13 @@ typedef struct {
   HashEntry* entries;
 } ObjHashMap;
 
+typedef struct {
+  Obj obj;
+  int arity;
+  Code code;
+  ObjString* name;
+} ObjFn;
+
 inline static Value num_to_val(double num) {
   return *((Value*)&(num));
 }
@@ -112,6 +131,9 @@ inline static bool is_object_type(Value c, ObjTy type) {
   return IS_OBJ(c) && AS_OBJ(c)->type == type;
 }
 
+void init_code(Code* code);
+void free_code(Code* code, VM* vm);
+void write_code(Code* code, byte_t byte, int line, VM* vm);
 void init_value_pool(ValuePool* vp);
 void free_value_pool(ValuePool* vp, VM* vm);
 int write_value(ValuePool* vp, Value v, VM* vm);
@@ -121,6 +143,7 @@ bool value_falsy(Value v);
 bool value_equal(Value a, Value b);
 Value object_to_string(VM* vm, Value val);
 Value value_to_string(VM* vm, Value val);
+void free_object(VM* vm, Obj* obj);
 Value create_string(
     VM* vm,
     ObjHashMap* table,
@@ -129,6 +152,7 @@ Value create_string(
     bool is_alloc);
 ObjList* create_list(VM* vm, int len);
 ObjHashMap* create_hashmap(VM* vm);
+ObjFn* create_function(VM* vm);
 void hashmap_init(ObjHashMap* table);
 bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);
 Value hashmap_get(ObjHashMap* table, Value key);

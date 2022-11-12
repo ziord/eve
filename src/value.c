@@ -23,6 +23,33 @@ int write_value(ValuePool* vp, Value v, VM* vm) {
   return vp->length++;
 }
 
+void init_code(Code* code) {
+  code->lines = NULL;
+  code->bytes = NULL;
+  code->length = 0;
+  code->capacity = 0;
+  init_value_pool(&code->vpool);
+}
+
+void free_code(Code* code, VM* vm) {
+  FREE(vm, code->bytes, byte_t);
+  FREE(vm, code->lines, int);
+  free_value_pool(&code->vpool, vm);
+  init_code(code);
+}
+
+void write_code(Code* code, byte_t byte, int line, VM* vm) {
+  if (code->length >= code->capacity) {
+    code->capacity = GROW_CAPACITY(code->capacity);
+    code->bytes =
+        GROW_BUFFER(vm, code->bytes, byte_t, code->length, code->capacity);
+    code->lines =
+        GROW_BUFFER(vm, code->lines, int, code->length, code->capacity);
+  }
+  code->bytes[code->length] = byte;
+  code->lines[code->length++] = line;
+}
+
 char* get_object_type(Obj* obj) {
   switch (obj->type) {
     case OBJ_STR:
@@ -54,6 +81,11 @@ void print_object(Value val, Obj* obj) {
   switch (obj->type) {
     case OBJ_STR: {
       printf("\"%s\"", AS_STRING(val)->str);
+      break;
+    }
+    case OBJ_FN: {
+      ObjString* name = AS_FUNC(val)->name;
+      printf("{fn %s}", name ? name->str : "<>");
       break;
     }
     case OBJ_LIST: {
@@ -150,6 +182,13 @@ Value object_to_string(VM* vm, Value val) {
       int len = snprintf(buff, 20, "@hashmap[%d]", AS_HMAP(val)->length);
       return (create_string(vm, &vm->strings, buff, len, false));
     }
+    case OBJ_FN: {
+      ObjString* name = AS_FUNC(val)->name;
+      int len = 10 + (name ? name->length : 3);
+      char buff[len];
+      len = snprintf(buff, len, "@fn[%s]", name ? name->str : "<>");
+      return (create_string(vm, &vm->strings, buff, len, false));
+    }
     default:
       UNREACHABLE("object value to string");
   }
@@ -181,6 +220,34 @@ Value value_to_string(VM* vm, Value val) {
     return (create_string(vm, &vm->strings, "None", 4, false));
   } else {
     UNREACHABLE("primitive value to string");
+  }
+}
+
+void free_object(VM* vm, Obj* obj) {
+  switch (obj->type) {
+    case OBJ_STR: {
+      ObjString* st = (ObjString*)obj;
+      FREE(vm, st->str, char);
+      FREE(vm, st, ObjString);
+      break;
+    }
+    case OBJ_LIST: {
+      ObjList* list = (ObjList*)obj;
+      FREE(vm, list, ObjList);
+      break;
+    }
+    case OBJ_HMAP: {
+      ObjHashMap* map = (ObjHashMap*)obj;
+      FREE(vm, map->entries, HashEntry);
+      FREE(vm, map, ObjHashMap);
+      break;
+    }
+    case OBJ_FN: {
+      ObjFn* func = (ObjFn*)obj;
+      free_code(&func->code, vm);
+      FREE(vm, func, ObjFn);
+      break;
+    }
   }
 }
 
@@ -255,6 +322,14 @@ ObjHashMap* create_hashmap(VM* vm) {
   return hm;
 }
 
+ObjFn* create_function(VM* vm) {
+  ObjFn* fn = CREATE_OBJ(vm, ObjFn, OBJ_FN, sizeof(ObjFn));
+  init_code(&fn->code);
+  fn->arity = 0;
+  fn->name = NULL;
+  return fn;
+}
+
 static uint32_t hash_bits(uint64_t hash) {
   // from Wren,
   // adapted from http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm
@@ -282,6 +357,10 @@ static uint32_t hash_object(Obj* obj) {
   switch (obj->type) {
     case OBJ_STR:
       return ((ObjString*)obj)->hash;
+    case OBJ_FN: {
+      ObjFn* fn = (ObjFn*)obj;
+      return hash_bits(fn->arity) ^ hash_bits(fn->code.length);
+    }
     default:
       // TODO: better error handling
       error("Unhashable type '%s'", get_object_type(obj));

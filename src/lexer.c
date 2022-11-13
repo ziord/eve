@@ -27,6 +27,7 @@ char* token_types[] = {
     [TK_ASSERT] = "assert",   [TK_IF] = "if",
     [TK_ELSE] = "else",       [TK_WHILE] = "while",
     [TK_BREAK] = "break",     [TK_CONTINUE] = "continue",
+    [TK_FN] = "fn",           [TK_RETURN] = "return",
 };
 
 void init_lexer(Lexer* lexer, char* src) {
@@ -222,9 +223,12 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
       return expect(lexer, "rue", 1, 3, TK_TRUE);
     case 'f':
       switch (*(lexer->start + 1)) {
+        case 'n':
+          return expect(lexer, "", 2, 0, TK_FN);
         case 'a':
           return expect(lexer, "lse", 2, 3, TK_FALSE);
       }
+      break;
     case 'N':
       return expect(lexer, "one", 1, 3, TK_NONE);
     case 's':
@@ -232,9 +236,11 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
         case 'h':
           return expect(lexer, "ow", 2, 2, TK_SHOW);
       }
+      break;
     case 'w':
       return expect(lexer, "hile", 1, 4, TK_WHILE);
     case 'r':
+      return expect(lexer, "eturn", 1, 5, TK_RETURN);
     case 'i':
       return expect(lexer, "f", 1, 1, TK_IF);
     case 'e':
@@ -279,6 +285,13 @@ Token lex_string(Lexer* lexer, char start) {
 
 bool is_current_symbol(Lexer* lexer, char ch) {
   return PEEK(lexer) == ch;
+}
+
+void rewind_state(Lexer* lexer, Token token) {
+  lexer->current = token.value + token.length;
+  lexer->start = lexer->current;
+  lexer->line = token.line;
+  lexer->column = lexer->column;
 }
 
 Token get_token(Lexer* lexer) {

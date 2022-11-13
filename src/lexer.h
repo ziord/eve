@@ -48,10 +48,12 @@ typedef enum {
   TK_LET,           // let
   TK_ASSERT,        // assert
   TK_IF,            // if
+  TK_FN,            // fn
   TK_ELSE,          // else
   TK_WHILE,         // while
   TK_BREAK,         // break
   TK_CONTINUE,      // continue
+  TK_RETURN,        // return
   TK_IDENT,         // identifier
   TK_STRING,        // "..."
   TK_EOF,           // EOF
@@ -80,5 +82,6 @@ void init_lexer(Lexer* lexer, char* src);
 char* get_src_at_line(Lexer* lexer, Token token, int* padding, int* len);
 bool is_current_symbol(Lexer* lexer, char ch);
 Token get_token(Lexer* lexer);
+void rewind_state(Lexer* lexer, Token token);
 
 #endif  //EVE_LEXER_H

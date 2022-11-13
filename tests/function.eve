@@ -1,0 +1,126 @@
+#*
+* Function declarations tests
+*#
+
+## no args
+fn printer() {
+    show "I'm okay";
+}
+
+assert printer;
+assert printer() == None;
+
+## single arg
+fn printer(value) {
+    show value;
+    return value;
+}
+
+assert printer(2) == 2;
+
+## multiple args
+fn add(a, b) {
+  show a, b;
+  return a + b;
+}
+
+assert add(5, 12) == 17;
+
+## scopes
+{
+    fn printer(_unused) {
+        return "oops";
+    }
+    assert printer(0xdead) == "oops";
+}
+
+#*
+Function expression tests
+*#
+
+## no args
+let adder = fn () {
+    return add(3, 5);
+};
+
+assert adder() == 8;
+
+let foo = fn () {
+    return [add];
+};
+
+assert foo()[-1](5, 8) == 13;
+
+assert fn () {
+         return add(10, 5);
+     }() == 15;
+
+assert (fn () {
+         return add(10, 5);
+     })() == 15;
+
+## single arg
+assert (fn(){})() == None;
+assert fn(){}() == None;
+
+fn (a) {
+    return a;
+};
+
+fn (a) {
+    return a;
+}(5);
+
+assert fn(a) {
+           return a**a;
+       }(5) == 3125;
+
+let x = 0xff + fn () { return foo()[-1](5, 8); }() + 12;
+assert x == 280;
+
+if fn(a){return a;}(5) == 25/5 {
+    assert true;
+} else {
+    assert false;
+}
+
+## multiple args
+assert fn (a, b) {
+    return a - b;
+}(5, 10) == -5;
+
+let x = [fn () { return 0xdeadbeef; }, fn (a) { return a ** a; }];
+let y = #{x[0](): x[1](10)};
+assert y[0xdeadbeef] == 1e+10;
+
+## empty 'return' should return None
+assert fn () {return;}() == None;
+
+fn fax() {
+    show "nothing";
+    return;
+}
+
+assert fax() == None;
+
+fn maybe(x) {
+    if x > 5 {
+        return x * 12;
+    } else {
+        return;
+    }
+}
+
+assert maybe(2) == None;
+assert maybe(5) == None;
+assert maybe(12) == 144;
+
+fn should_be_5() {
+    return 5;
+    let x = 10;
+    return 10;
+    return 15;
+    return "deadcode" + x;  ## runtime error
+}
+
+assert should_be_5() == 5;

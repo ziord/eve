@@ -58,6 +58,8 @@ char* get_object_type(Obj* obj) {
       return "list";
     case OBJ_HMAP:
       return "hashmap";
+    case OBJ_FN:
+      return "function";
     default:
       UNREACHABLE("unknown object type");
   }
@@ -80,20 +82,27 @@ char* get_value_type(Value val) {
 void print_object(Value val, Obj* obj) {
   switch (obj->type) {
     case OBJ_STR: {
-      printf("\"%s\"", AS_STRING(val)->str);
+      printf("%s", AS_STRING(val)->str);
       break;
     }
     case OBJ_FN: {
-      ObjString* name = AS_FUNC(val)->name;
-      printf("{fn %s}", name ? name->str : "<>");
+      printf("{fn %s}", get_func_name(AS_FUNC(val)));
       break;
     }
     case OBJ_LIST: {
       ObjList* list = AS_LIST(val);
+      Value elem;
       printf("[");
       for (int i = 0; i < list->elems.length; i++) {
-        if (list->elems.buffer[i] != val) {
-          print_value(list->elems.buffer[i]);
+        elem = list->elems.buffer[i];
+        if (elem != val) {
+          if (!IS_STRING(elem)) {
+            print_value(elem);
+          } else {
+            printf("\"");
+            print_object(elem, AS_OBJ(elem));
+            printf("\"");
+          }
         } else {
           printf("[...]");
         }
@@ -115,10 +124,24 @@ void print_object(Value val, Obj* obj) {
             // skip deleted and fresh entries
             continue;
           }
-          print_value(entry->key);
+          // print key
+          if (IS_STRING(entry->key)) {
+            printf("\"");
+            print_object(entry->key, AS_OBJ(entry->key));
+            printf("\"");
+          } else {
+            print_value(entry->key);
+          }
           printf(": ");
+          // print value
           if (entry->value != val) {
-            print_value(entry->value);
+            if (IS_STRING(entry->value)) {
+              printf("\"");
+              print_object(entry->value, AS_OBJ(entry->value));
+              printf("\"");
+            } else {
+              print_value(entry->value);
+            }
           } else {
             printf("#{...}");
           }
@@ -142,7 +165,7 @@ void print_value(Value val) {
   } else if (IS_BOOL(val)) {
     printf("%s", AS_BOOL(val) ? "true" : "false");
   } else if (IS_NUMBER(val)) {
-    printf("%g", AS_NUMBER(val));
+    printf("%.14g", AS_NUMBER(val));
   } else if (IS_NONE(val)) {
     printf("None");
   } else if (IS_NOTHING(val)) {
@@ -328,6 +351,10 @@ ObjFn* create_function(VM* vm) {
   fn->arity = 0;
   fn->name = NULL;
   return fn;
+}
+
+inline char* get_func_name(ObjFn* fn) {
+  return fn->name ? fn->name->str : "<anonymous>";
 }
 
 static uint32_t hash_bits(uint64_t hash) {

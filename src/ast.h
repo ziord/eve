@@ -49,7 +49,10 @@ typedef enum {
   AST_IF_STMT,
   AST_WHILE_STMT,
   AST_CONTROL_STMT,
+  AST_RETURN_STMT,
   AST_VAR_DECL,
+  AST_FUNC,
+  AST_CALL,
   AST_PROGRAM,
 } AstTy;
 
@@ -173,6 +176,23 @@ typedef struct {
 
 typedef struct {
   AstTy type;
+  int line;
+  int params_count;
+  AstNode* params[CONST_MAX];
+  AstNode* name;  // VarNode
+  AstNode* body;  // BlockStmtNode
+} FuncNode;
+
+typedef struct {
+  AstTy type;
+  int line;
+  int args_count;
+  AstNode* args[CONST_MAX];
+  AstNode* left;
+} CallNode;
+
+typedef struct {
+  AstTy type;
   Vec decls;
 } ProgramNode;
 
@@ -185,6 +205,8 @@ union AstNode {
   ListNode list;
   MapNode map;
   VarNode var;
+  FuncNode func;
+  CallNode call;
   SubscriptNode subscript;
   ExprStmtNode expr_stmt;
   ShowStmtNode show_stmt;
@@ -207,6 +229,7 @@ void free_store(NodeStore* store);
 OpTy get_op(TokenTy ty);
 AstNode* new_ast_node(NodeStore* store);
 AstNode* new_num(NodeStore* store, double val, int line);
+AstNode* new_none(NodeStore* store, int line);
 AstNode* new_unary(NodeStore* store, AstNode* node, int line, OpTy op);
 AstNode* new_binary(
     NodeStore* store,

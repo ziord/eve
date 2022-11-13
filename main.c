@@ -27,7 +27,6 @@ int execute(char* fp) {
     cleanup(&parser, src);
     return RESULT_COMPILE_ERROR;
   }
-  dis_code(&func->code, func->name ? func->name->str : "<>");
   free_parser(&parser);
   // run
   boot_vm(&vm, func);

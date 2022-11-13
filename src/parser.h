@@ -13,6 +13,7 @@ typedef struct {
   bool panicking;
   int errors;
   int loop;
+  int func;
   const char* file_path;
   NodeStore store;
 } Parser;

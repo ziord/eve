@@ -64,7 +64,14 @@ inline static bool push_frame(VM* vm, CallFrame frame) {
 }
 
 inline static CallFrame pop_frame(VM* vm) {
-  return *(vm->fp--);
+  // get last pushed frame
+  CallFrame frame = vm->frames[vm->frame_count - 1];
+  --vm->frame_count;
+  if (vm->frame_count > 0) {
+    // set current frame
+    vm->fp = &vm->frames[vm->frame_count - 1];
+  }
+  return frame;
 }
 
 inline static void print_stack(VM* vm) {
@@ -214,10 +221,33 @@ perform_subscript_assign(VM* vm, Value var, Value subscript, Value value) {
   return false;
 }
 
+inline static bool call_value(VM* vm, Value val, int argc) {
+  if (IS_FUNC(val)) {
+    ObjFn* fn = AS_FUNC(val);
+    if (argc == fn->arity) {
+      CallFrame frame = {
+          .func = fn,
+          .stack = vm->sp - 1 - argc,
+          .ip = fn->code.bytes};
+      push_frame(vm, frame);
+      return true;
+    }
+    runtime_error(
+        vm,
+        "'%s' function takes %d argument(s) but got %d",
+        get_func_name(fn),
+        fn->arity,
+        argc);
+  } else {
+    runtime_error(vm, "'%s' type is not callable", get_value_type(val));
+  }
+  return false;
+}
+
 IResult run(VM* vm) {
   register byte_t inst;
   for (;;) {
-#if defined(DEBUG_EXECUTION)
+#if defined(EVE_DEBUG_EXECUTION)
     print_stack(vm);
     dis_instruction(
         &vm->fp->func->code,
@@ -248,7 +278,7 @@ IResult run(VM* vm) {
         break;
       }
       case $GET_LOCAL: {
-        push_stack(vm, vm->stack[READ_BYTE(vm)]);
+        push_stack(vm, vm->fp->stack[READ_BYTE(vm)]);
         break;
       }
       case $SET_GLOBAL: {
@@ -278,7 +308,21 @@ IResult run(VM* vm) {
         break;
       }
       case $RET: {
-        return RESULT_SUCCESS;
+        CallFrame frame = pop_frame(vm);
+        if (vm->frame_count == 0) {
+          return RESULT_SUCCESS;
+        }
+        Value ret_val = pop_stack(vm);
+        vm->sp = frame.stack;
+        push_stack(vm, ret_val);
+        break;
+      }
+      case $CALL: {
+        int argc = READ_BYTE(vm);
+        if (!call_value(vm, PEEK_STACK_AT(vm, argc), argc)) {
+          return RESULT_RUNTIME_ERROR;
+        }
+        break;
       }
       case $ADD: {
         BINARY_OP(vm, +, NUMBER_VAL)

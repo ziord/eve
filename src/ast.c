@@ -89,6 +89,18 @@ AstNode* new_num(NodeStore* store, double val, int line) {
   return node;
 }
 
+AstNode* new_none(NodeStore* store, int line) {
+  AstNode* node = new_ast_node(store);
+  node->unit = (UnitNode) {
+      .type = AST_UNIT,
+      .line = line,
+      .is_none = true,
+      .is_bool = false,
+      .is_true_bool = false,
+      .is_false_bool = false};
+  return node;
+}
+
 AstNode* new_binary(
     NodeStore* store,
     AstNode* left,

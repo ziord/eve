@@ -27,6 +27,7 @@ typedef enum BindingPower {
   BP_FACTOR,      // /, *, %
   BP_POWER,       // **
   BP_UNARY,       // !, -, +, ~
+  BP_CALL,        // ()
   BP_ACCESS,      // [], .
 } BindingPower;
 // clang-format on
@@ -38,6 +39,7 @@ typedef struct {
 } ExprParseTable;
 
 static AstNode* _parse(Parser* parser, BindingPower bp);
+static AstNode* parse_func_decl(Parser* parser, bool is_lambda);
 static AstNode* parse_expr(Parser* parser);
 static AstNode* parse_num(Parser* parser, bool assignable);
 static AstNode* parse_unary(Parser* parser, bool assignable);
@@ -53,6 +55,8 @@ parse_subscript(Parser* parser, AstNode* left, bool assignable);
 static AstNode* parse_var(Parser* parser, bool assignable);
 static AstNode* parse_decls(Parser* parser);
 static AstNode* parse_stmt(Parser* parser);
+static AstNode* parse_func_expr(Parser* parser, bool assignable);
+static AstNode* parse_call(Parser* parser, AstNode* left, bool assignable);
 
 // clang-format off
 ExprParseTable p_table[] = {
@@ -76,7 +80,7 @@ ExprParseTable p_table[] = {
   [TK_AMP_AMP] = {.bp = BP_AND, .prefix = NULL, .infix = parse_binary},
   [TK_PIPE] = {.bp = BP_BW_OR, .prefix = NULL, .infix = parse_binary},
   [TK_COMMA] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
-  [TK_LBRACK] = {.bp = BP_NONE, .prefix = parse_grouping, .infix = NULL},
+  [TK_LBRACK] = {.bp = BP_CALL, .prefix = parse_grouping, .infix = parse_call},
   [TK_RBRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LSQ_BRACK] = {.bp = BP_ACCESS, .prefix = parse_list, .infix = parse_subscript},
   [TK_RSQ_BRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -97,8 +101,10 @@ ExprParseTable p_table[] = {
   [TK_IF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ELSE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ASSERT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_FN] = {.bp = BP_NONE, .prefix = parse_func_expr, .infix = NULL},
   [TK_WHILE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_CONTINUE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_RETURN] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_BREAK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_IDENT] = {.bp = BP_NONE, .prefix = parse_var, .infix = NULL},
   [TK_STRING] = {.bp = BP_NONE, .prefix = parse_string, .infix = NULL},
@@ -124,7 +130,8 @@ Parser new_parser(char* src, const char* fp) {
       .file_path = fp,
       .errors = 0,
       .panicking = false,
-      .loop = 0};
+      .loop = 0,
+      .func = 0};
   init_store(&parser.store);
   return parser;
 }
@@ -338,6 +345,27 @@ AstNode* handle_aug_assign(
   return node;
 }
 
+static void set_return(Parser* parser, BlockStmtNode* node) {
+  AstNode *last = NULL, *ret = NULL;
+  int line;
+  if (node->stmts.len) {
+    last = node->stmts.items[node->stmts.len - 1];
+  } else {
+    goto set_ret;
+  }
+  if (last->num.type != AST_RETURN_STMT) {
+  set_ret:
+    // inject "return None"
+    ret = new_node(parser);
+    line = parser->previous_tk.line;
+    ret->expr_stmt = (ExprStmtNode) {
+        .type = AST_RETURN_STMT,
+        .line = line,
+        .expr = new_none(&parser->store, line)};
+    vec_push(&node->stmts, ret);
+  }
+}
+
 static AstNode* parse_num(Parser* parser, bool assignable) {
   int line = parser->current_tk.line;
   consume(parser, TK_NUM);
@@ -352,6 +380,18 @@ static AstNode* parse_num(Parser* parser, bool assignable) {
   ASSERT(tok.value + tok.length == endptr, "failed to convert number");
   AstNode* node = new_num(&parser->store, val, line);
   return node;
+}
+
+static AstNode* parse_var(Parser* parser, bool assignable) {
+  consume(parser, TK_IDENT);
+  Token tok = parser->previous_tk;
+  AstNode* node = new_node(parser);
+  node->var = (VarNode) {
+      .line = tok.line,
+      .len = tok.length,
+      .name = tok.value,
+      .type = AST_VAR};
+  return handle_aug_assign(parser, node, assignable, tok);
 }
 
 static AstNode* parse_string(Parser* parser, bool assignable) {
@@ -396,16 +436,18 @@ static AstNode* parse_list(Parser* parser, bool assignable) {
   list->type = AST_LIST;
   list->line = parser->previous_tk.line;
   list->len = 0;
+  Token tok;
   while (!match(parser, TK_RSQ_BRACK)) {
     if (list->len > 0) {
       consume(parser, TK_COMMA);
     }
+    tok = parser->current_tk;
+    list->elems[list->len++] = parse_expr(parser);
     if (list->len > CONST_MAX) {
       CREATE_BUFFER(buff, error_types[E0007].hlp_msg, CONST_MAX)
-      ErrorArgs args = new_error_arg(NULL, NULL, buff);
+      ErrorArgs args = new_error_arg(&tok, NULL, buff);
       return parse_error(parser, E0007, &args);
     }
-    list->elems[list->len++] = parse_expr(parser);
   }
   return node;
 }
@@ -421,20 +463,22 @@ static AstNode* parse_map(Parser* parser, bool assignable) {
   map->length = 0;
   map->type = AST_MAP;
   AstNode *value, *key;
+  Token tok;
   while (!match(parser, TK_RCURLY)) {
-    if (map->length > CONST_MAX) {
-      CREATE_BUFFER(buff, error_types[E0009].hlp_msg, CONST_MAX)
-      ErrorArgs args = new_error_arg(NULL, NULL, buff);
-      return parse_error(parser, E0009, &args);
-    }
     if (map->length > 0) {
       consume(parser, TK_COMMA);
     }
+    tok = parser->current_tk;
     key = parse_expr(parser);
     consume(parser, TK_COLON);
     value = parse_expr(parser);
     map->items[map->length][0] = key;
     map->items[map->length++][1] = value;
+    if (map->length > CONST_MAX) {
+      CREATE_BUFFER(buff, error_types[E0009].hlp_msg, CONST_MAX)
+      ErrorArgs args = new_error_arg(&tok, NULL, buff);
+      return parse_error(parser, E0009, &args);
+    }
   }
   return node;
 }
@@ -464,6 +508,40 @@ static AstNode* parse_literal(Parser* parser, bool assignable) {
       .is_none = none_val,
       .is_false_bool = false_val,
       .is_true_bool = true_val};
+  return node;
+}
+
+static AstNode* parse_func_expr(Parser* parser, bool assignable) {
+  /*
+   * fn (params..) {
+   *  stmt*
+   *  }
+   */
+  return parse_func_decl(parser, true);
+}
+
+static AstNode* parse_call(Parser* parser, AstNode* left, bool assignable) {
+  consume(parser, TK_LBRACK);
+  AstNode* node = new_node(parser);
+  node->call = (CallNode) {
+      .type = AST_CALL,
+      .line = parser->previous_tk.line,
+      .left = left,
+      .args_count = 0};
+  Token tok;
+  while (!is_tty(parser, TK_RBRACK) && !is_tty(parser, TK_EOF)) {
+    if (node->call.args_count > 0) {
+      consume(parser, TK_COMMA);
+    }
+    tok = parser->current_tk;
+    node->call.args[node->call.args_count++] = parse_expr(parser);
+    if (node->call.args_count > CONST_MAX) {
+      CREATE_BUFFER(buff, error_types[E0010].hlp_msg, CONST_MAX)
+      ErrorArgs args = new_error_arg(&tok, NULL, buff);
+      return parse_error(parser, E0010, &args);
+    }
+  }
+  consume(parser, TK_RBRACK);
   return node;
 }
 
@@ -525,16 +603,18 @@ static AstNode* parse_show_stmt(Parser* parser) {
   show_stmt->line = parser->previous_tk.line;
   show_stmt->type = AST_SHOW_STMT;
   show_stmt->length = 0;
+  Token tok;
   do {
-    if (show_stmt->length > CONST_MAX) {
-      CREATE_BUFFER(buff, error_types[E0010].hlp_msg, CONST_MAX)
-      ErrorArgs args = new_error_arg(NULL, NULL, buff);
-      return parse_error(parser, E0010, &args);
-    }
     if (show_stmt->length > 0) {
       consume(parser, TK_COMMA);
     }
+    tok = parser->current_tk;
     show_stmt->items[show_stmt->length++] = parse_expr(parser);
+    if (show_stmt->length > CONST_MAX) {
+      CREATE_BUFFER(buff, error_types[E0010].hlp_msg, CONST_MAX)
+      ErrorArgs args = new_error_arg(&tok, NULL, buff);
+      return parse_error(parser, E0010, &args);
+    }
   } while (!match(parser, TK_SEMI_COLON));
   return stmt;
 }
@@ -664,6 +744,25 @@ static AstNode* parse_while_stmt(Parser* parser) {
   return node;
 }
 
+static AstNode* parse_return_stmt(Parser* parser) {
+  if (!parser->func) {
+    return parse_error(parser, E0008, NULL);
+  }
+  consume(parser, TK_RETURN);
+  AstNode* node = new_node(parser);
+  node->expr_stmt = (ExprStmtNode) {
+      .type = AST_RETURN_STMT,
+      .line = parser->previous_tk.line,
+      .expr = NULL};
+  if (!match(parser, TK_SEMI_COLON)) {
+    node->expr_stmt.expr = parse_expr(parser);
+    consume(parser, TK_SEMI_COLON);
+  } else {
+    node->expr_stmt.expr = new_none(&parser->store, node->expr_stmt.line);
+  }
+  return node;
+}
+
 static AstNode* parse_stmt(Parser* parser) {
   switch (parser->current_tk.ty) {
     case TK_SHOW:
@@ -679,6 +778,8 @@ static AstNode* parse_stmt(Parser* parser) {
     case TK_BREAK:
     case TK_CONTINUE:
       return parse_control_stmt(parser);
+    case TK_RETURN:
+      return parse_return_stmt(parser);
     default:
       return parse_expr_stmt(parser);
   }
@@ -708,16 +809,80 @@ static AstNode* parse_var_decl(Parser* parser) {
   return decl;
 }
 
-static AstNode* parse_var(Parser* parser, bool assignable) {
-  advance(parser);
-  Token tok = parser->previous_tk;
+static AstNode* parse_func_decl(Parser* parser, bool is_lambda) {
+  /*
+   * fn my_func(param...) {
+   *  stmt*
+   *  }
+   */
+
+  Token prev_tok = parser->previous_tk;
+  Token curr_tok = parser->current_tk;
+  consume(parser, TK_FN);
+  AstNode* name = NULL;
+  // handle (top-level) function declarations
+  if (!is_lambda) {
+    // check so we don't mistake a function expression (lambda) as a function
+    // declaration, this can happen when a lambda is a standalone expression
+    // statement, i.e. fn () {...} ;
+    if (!is_tty(parser, TK_IDENT)) {
+      rewind_state(&parser->lexer, curr_tok);
+      parser->current_tk = curr_tok;
+      parser->previous_tk = prev_tok;
+      return parse_expr_stmt(parser);
+    } else {
+      name = parse_var(parser, false);
+    }
+  }
+  parser->func++;
+  // params
+  consume(parser, TK_LBRACK);
   AstNode* node = new_node(parser);
-  node->var = (VarNode) {
-      .line = tok.line,
-      .len = tok.length,
-      .name = tok.value,
-      .type = AST_VAR};
-  return handle_aug_assign(parser, node, assignable, tok);
+  node->func = (FuncNode) {
+      .type = AST_FUNC,
+      .name = name,
+      .params_count = 0,
+      .line = curr_tok.line};
+  AstNode* var_node;
+  VarNode* check;
+  Token tok;
+  while (!is_tty(parser, TK_RBRACK) && !is_tty(parser, TK_EOF)) {
+    if (node->func.params_count > 0) {
+      consume(parser, TK_COMMA);
+    }
+    tok = parser->current_tk;
+    var_node = parse_var(parser, false);
+    // check for duplicate params
+    for (int i = 0; i <= node->func.params_count - 1; i++) {
+      check = &node->func.params[i]->var;
+      if (var_node->var.len == check->len
+          && memcmp(var_node->var.name, check->name, var_node->var.len)
+              == 0) {
+        int len = BUFFER_SIZE + check->len;
+        char buff[len];
+        snprintf(
+            buff,
+            len,
+            error_types[E0011].err_msg,
+            check->len,
+            check->name);
+        ErrorArgs args = new_error_arg(&tok, buff, NULL);
+        return parse_error(parser, E0011, &args);
+      }
+    }
+    node->func.params[node->func.params_count++] = var_node;
+    if (node->func.params_count > CONST_MAX) {
+      CREATE_BUFFER(buff, error_types[E0012].hlp_msg, CONST_MAX)
+      ErrorArgs args = new_error_arg(&tok, NULL, buff);
+      return parse_error(parser, E0012, &args);
+    }
+  }
+  consume(parser, TK_RBRACK);
+  // body
+  node->func.body = parse_block_stmt(parser);
+  set_return(parser, &node->func.body->block_stmt);
+  parser->func--;
+  return node;
 }
 
 void resync(Parser* parser) {
@@ -729,6 +894,7 @@ void resync(Parser* parser) {
       case TK_ASSERT:
       case TK_WHILE:
       case TK_IF:
+      case TK_FN:
         return;
       default:
         advance(parser);
@@ -739,6 +905,8 @@ void resync(Parser* parser) {
 static AstNode* parse_decls(Parser* parser) {
   if (is_tty(parser, TK_LET)) {
     return parse_var_decl(parser);
+  } else if (is_tty(parser, TK_FN)) {
+    return parse_func_decl(parser, false);
   }
   return parse_stmt(parser);
 }

@@ -47,6 +47,7 @@ typedef enum {
   $SET_LOCAL,
   $ASSERT,
   $LOOP,
+  $CALL,
   $RET
 } OpCode;
 

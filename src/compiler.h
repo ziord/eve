@@ -18,7 +18,7 @@ typedef struct {
   ControlStmtNode* node;
 } LoopVar;
 
-typedef struct {
+typedef struct Compiler {
   int errors;
   int scope;
   int locals_count;
@@ -29,6 +29,7 @@ typedef struct {
   LoopVar controls[MAX_CONTROLS];
   LoopVar current_loop;
   VM* vm;
+  struct Compiler* enclosing;
 } Compiler;
 
 Compiler new_compiler(AstNode* node, ObjFn* func, VM* vm);

@@ -82,3 +82,7 @@ if false {
 } else {
     assert false;
 }
+
+let x = 0;
+if true { } else {x = 5; }
+assert x == 0;

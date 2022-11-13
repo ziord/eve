@@ -45,7 +45,8 @@ Compiler new_compiler(AstNode* node, ObjFn* func, VM* vm) {
       .locals_count = 0,
       .controls_count = 0,
       .errors = 0,
-      .current_loop = {.scope = -1}};
+      .current_loop = {.scope = 0},
+      .enclosing = NULL};
   reserve_local(&compiler);
   return compiler;
 }
@@ -88,6 +89,12 @@ inline static int add_lvar(Compiler* compiler, VarNode* node) {
   var->name_len = node->len;
   var->initialized = false;
   return compiler->locals_count - 1;
+}
+
+inline static int init_lvar(Compiler* compiler, VarNode* node) {
+  int index = add_lvar(compiler, node);
+  compiler->locals[index].initialized = true;
+  return index;
 }
 
 inline static int find_lvar(Compiler* compiler, VarNode* node) {
@@ -431,6 +438,66 @@ void c_while_stmt(Compiler* compiler, AstNode* node) {
   compiler->current_loop = curr;
 }
 
+void c_return(Compiler* compiler, AstNode* node) {
+  ExprStmtNode* expr = &node->expr_stmt;
+  c_(compiler, expr->expr);
+  emit_byte(compiler, $RET, expr->line);
+}
+
+void c_call(Compiler* compiler, AstNode* node) {
+  CallNode* call_node = &node->call;
+  c_(compiler, call_node->left);
+  for (int i = 0; i < call_node->args_count; i++) {
+    c_(compiler, call_node->args[i]);
+  }
+  emit_byte(compiler, $CALL, call_node->line);
+  emit_byte(compiler, CAST(byte_t, call_node->args_count), call_node->line);
+}
+
+void c_func(Compiler* compiler, AstNode* node) {
+  // let func = fn () {..} | fn func() {...}
+  FuncNode* func = &node->func;
+  // create a new compiler for the function
+  ObjFn* fn_obj = create_function(compiler->vm);
+  // only emit definition for globals
+  bool emit_name = compiler->scope <= 0;
+  int name_slot = -1;
+  if (emit_name) {
+    // global function
+    if (func->name) {
+      name_slot = store_variable(compiler, &func->name->var);
+      fn_obj->name =
+          AS_STRING(compiler->func->code.vpool.values[name_slot]);
+    }
+  } else {
+    // local function
+    // set as initialized for functions with recursive calls
+    init_lvar(compiler, &func->name->var);
+  }
+  Compiler func_compiler = new_compiler(node, fn_obj, compiler->vm);
+  func_compiler.enclosing = compiler;
+  // compile params
+  func_compiler.scope++;  // make params local to the function
+  for (int i = 0; i < func->params_count; i++) {
+    VarNode* param = &func->params[i]->var;
+    init_lvar(&func_compiler, param);
+  }
+  fn_obj->arity = func->params_count;
+  // compile function body
+  c_(&func_compiler, func->body);
+  emit_value(compiler, $LOAD_CONST, OBJ_VAL(fn_obj), func->line);
+  if (emit_name && name_slot != -1) {
+    emit_byte(compiler, $DEFINE_GLOBAL, func->line);
+    emit_byte(compiler, name_slot, func->line);
+  }
+#ifdef EVE_DEBUG
+  if (!func_compiler.errors) {
+    dis_code(&fn_obj->code, get_func_name(fn_obj));
+    printf("\n");
+  }
+#endif
+}
+
 void c_program(Compiler* compiler, AstNode* node) {
   ProgramNode* program = CAST(ProgramNode*, node);
   for (int i = 0; i < vec_size(&program->decls); i++) {
@@ -495,6 +562,15 @@ void c_(Compiler* compiler, AstNode* node) {
     case AST_CONTROL_STMT:
       c_control_stmt(compiler, node);
       break;
+    case AST_FUNC:
+      c_func(compiler, node);
+      break;
+    case AST_RETURN_STMT:
+      c_return(compiler, node);
+      break;
+    case AST_CALL:
+      c_call(compiler, node);
+      break;
     case AST_PROGRAM:
       c_program(compiler, node);
       break;
@@ -508,6 +584,9 @@ void compile(Compiler* compiler) {
   if (compiler->errors) {
     free_code(&compiler->func->code, compiler->vm);
   }
-  emit_byte(compiler, $RET, 100);
+  emit_byte(compiler, $RET, last_line(compiler));
+#ifdef EVE_DEBUG
+  dis_code(&compiler->func->code, get_func_name(compiler->func));
+#endif
 }
 #pragma clang diagnostic pop

@@ -58,7 +58,7 @@ char* get_object_type(Obj* obj) {
       return "list";
     case OBJ_HMAP:
       return "hashmap";
-    case OBJ_FN:
+    case OBJ_CLOSURE:
       return "function";
     default:
       UNREACHABLE("unknown object type");
@@ -85,8 +85,8 @@ void print_object(Value val, Obj* obj) {
       printf("%s", AS_STRING(val)->str);
       break;
     }
-    case OBJ_FN: {
-      printf("{fn %s}", get_func_name(AS_FUNC(val)));
+    case OBJ_CLOSURE: {
+      printf("{fn %s}", get_func_name(AS_CLOSURE(val)->func));
       break;
     }
     case OBJ_LIST: {
@@ -154,6 +154,8 @@ void print_object(Value val, Obj* obj) {
       printf("}");
       break;
     }
+    case OBJ_CONTEXT:
+      UNREACHABLE("print_object - context");
     default:
       UNREACHABLE("print: unknown object type");
   }
@@ -205,8 +207,8 @@ Value object_to_string(VM* vm, Value val) {
       int len = snprintf(buff, 20, "@hashmap[%d]", AS_HMAP(val)->length);
       return (create_string(vm, &vm->strings, buff, len, false));
     }
-    case OBJ_FN: {
-      ObjString* name = AS_FUNC(val)->name;
+    case OBJ_CLOSURE: {
+      ObjString* name = AS_CLOSURE(val)->func->name;
       int len = 10 + (name ? name->length : 3);
       char buff[len];
       len = snprintf(buff, len, "@fn[%s]", name ? name->str : "<>");
@@ -271,6 +273,16 @@ void free_object(VM* vm, Obj* obj) {
       ObjFn* func = (ObjFn*)obj;
       free_code(&func->code, vm);
       FREE(vm, func, ObjFn);
+      break;
+    }
+    case OBJ_CLOSURE: {
+      ObjClosure* closure = (ObjClosure*)obj;
+      FREE_BUFFER(vm, closure->env, ObjContext*, closure->env_len);
+      FREE(vm, closure, ObjClosure);
+      break;
+    }
+    case OBJ_CONTEXT: {
+      FREE(vm, obj, ObjContext);
       break;
     }
   }
@@ -351,8 +363,24 @@ ObjFn* create_function(VM* vm) {
   ObjFn* fn = CREATE_OBJ(vm, ObjFn, OBJ_FN, sizeof(ObjFn));
   init_code(&fn->code);
   fn->arity = 0;
+  fn->env_len = 0;
   fn->name = NULL;
   return fn;
+}
+
+ObjClosure* create_closure(VM* vm, ObjFn* func) {
+  ObjClosure* closure =
+      CREATE_OBJ(vm, ObjClosure, OBJ_CLOSURE, sizeof(ObjClosure));
+  if (func->env_len) {
+    closure->env =
+        GROW_BUFFER(vm, closure->env, ObjContext*, 0, func->env_len);
+    for (int i = 0; i < func->env_len; i++) {
+      closure->env[i] = NULL;
+    }
+  }
+  closure->func = func;
+  closure->env_len = func->env_len;
+  return closure;
 }
 
 inline char* get_func_name(ObjFn* fn) {
@@ -386,8 +414,8 @@ static uint32_t hash_object(Obj* obj) {
   switch (obj->type) {
     case OBJ_STR:
       return ((ObjString*)obj)->hash;
-    case OBJ_FN: {
-      ObjFn* fn = (ObjFn*)obj;
+    case OBJ_CLOSURE: {
+      ObjFn* fn = ((ObjClosure*)obj)->func;
       return hash_bits(fn->arity) ^ hash_bits(fn->code.length);
     }
     default:

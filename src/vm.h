@@ -17,7 +17,7 @@ typedef enum {
 
 typedef struct {
   byte_t* ip;
-  ObjFn* func;
+  ObjClosure* closure;
   Value* stack;
 } CallFrame;
 

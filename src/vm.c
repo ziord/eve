@@ -3,7 +3,8 @@
 #define READ_BYTE(vm) (*(vm->fp->ip++))
 #define READ_SHORT(vm) \
   (vm->fp->ip += 2, ((vm->fp->ip[-2]) << 8u) | (vm->fp->ip[-1]))
-#define READ_CONST(vm) (vm->fp->func->code.vpool.values[READ_BYTE(vm)])
+#define READ_CONST(vm) \
+  (vm->fp->closure->func->code.vpool.values[READ_BYTE(vm)])
 #define PEEK_STACK(vm) (*(vm->sp - 1))
 #define PEEK_STACK_AT(vm, n) (*(vm->sp - 1 - (n)))
 #define BINARY_OP(vm, _op, _val_func) \
@@ -111,9 +112,13 @@ void boot_vm(VM* vm, ObjFn* func) {
   vm->bytes_alloc = 0;
   // assumes that 'strings' hashmap has been initialized already by the compiler
   hashmap_init(&vm->globals);
-  CallFrame frame = {.ip = func->code.bytes, .func = func, .stack = vm->sp};
+  ObjClosure* closure = create_closure(vm, func);
+  CallFrame frame = {
+      .ip = func->code.bytes,
+      .closure = closure,
+      .stack = vm->sp};
   push_frame(vm, frame);
-  push_stack(vm, OBJ_VAL(func));
+  push_stack(vm, OBJ_VAL(closure));
 }
 
 static IResult runtime_error(VM* vm, char* fmt, ...) {
@@ -222,11 +227,11 @@ perform_subscript_assign(VM* vm, Value var, Value subscript, Value value) {
 }
 
 inline static bool call_value(VM* vm, Value val, int argc) {
-  if (IS_FUNC(val)) {
-    ObjFn* fn = AS_FUNC(val);
+  if (IS_CLOSURE(val)) {
+    ObjFn* fn = AS_CLOSURE(val)->func;
     if (argc == fn->arity) {
       CallFrame frame = {
-          .func = fn,
+          .closure = AS_CLOSURE(val),
           .stack = vm->sp - 1 - argc,
           .ip = fn->code.bytes};
       push_frame(vm, frame);
@@ -250,8 +255,8 @@ IResult run(VM* vm) {
 #if defined(EVE_DEBUG_EXECUTION)
     print_stack(vm);
     dis_instruction(
-        &vm->fp->func->code,
-        (int)(vm->fp->ip - vm->fp->func->code.bytes));
+        &vm->fp->closure->func->code,
+        (int)(vm->fp->ip - vm->fp->closure->func->code.bytes));
 #endif
     inst = READ_BYTE(vm);
     switch (inst) {
@@ -486,6 +491,12 @@ IResult run(VM* vm) {
         }
         vm->sp -= len;
         push_stack(vm, OBJ_VAL(map));
+        break;
+      }
+      case $BUILD_CLOSURE: {
+        Value val = READ_CONST(vm);
+        ObjClosure* closure = create_closure(vm, AS_FUNC(val));
+        push_stack(vm, OBJ_VAL(closure));
         break;
       }
       case $BW_XOR: {

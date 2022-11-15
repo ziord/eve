@@ -485,7 +485,7 @@ void c_func(Compiler* compiler, AstNode* node) {
   fn_obj->arity = func->params_count;
   // compile function body
   c_(&func_compiler, func->body);
-  emit_value(compiler, $LOAD_CONST, OBJ_VAL(fn_obj), func->line);
+  emit_value(compiler, $BUILD_CLOSURE, OBJ_VAL(fn_obj), func->line);
   if (emit_name && name_slot != -1) {
     emit_byte(compiler, $DEFINE_GLOBAL, func->line);
     emit_byte(compiler, name_slot, func->line);

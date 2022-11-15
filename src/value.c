@@ -250,18 +250,20 @@ void free_object(VM* vm, Obj* obj) {
   switch (obj->type) {
     case OBJ_STR: {
       ObjString* st = (ObjString*)obj;
-      FREE(vm, st->str, char);
+      FREE_BUFFER(vm, st->str, char, st->length + 1);
       FREE(vm, st, ObjString);
       break;
     }
     case OBJ_LIST: {
       ObjList* list = (ObjList*)obj;
-      FREE(vm, list, ObjList);
+      size_t size =
+          sizeof(ObjList) + (sizeof(Value) * list->elems.capacity);
+      FREE_FLEX(vm, list, size);
       break;
     }
     case OBJ_HMAP: {
       ObjHashMap* map = (ObjHashMap*)obj;
-      FREE(vm, map->entries, HashEntry);
+      FREE_BUFFER(vm, map->entries, HashEntry, map->capacity);
       FREE(vm, map, ObjHashMap);
       break;
     }

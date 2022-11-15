@@ -7,7 +7,7 @@
 #include "util.h"
 
 #define FRAME_MAX (0x50)
-#define STACK_MAX ((FRAME_MAX) * (CONST_MAX))
+#define STACK_MAX ((FRAME_MAX) * (CONST_MAX + 1))
 
 typedef enum {
   RESULT_SUCCESS = 0,  // successful run

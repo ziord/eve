@@ -30,6 +30,11 @@
 
 #define FREE(vm, ptr, type) vm_alloc(vm, ptr, sizeof(type), 0, "")
 
+#define FREE_BUFFER(vm, ptr, type, count) \
+  vm_alloc(vm, ptr, (sizeof(type) * (count)), 0, "")
+
+#define FREE_FLEX(vm, ptr, size) vm_alloc(vm, ptr, (size), 0, "")
+
 void* vm_alloc(
     VM* vm,
     void* ptr,
@@ -38,6 +43,6 @@ void* vm_alloc(
     char* fmt,
     ...);
 
-void* alloc(void *ptr, size_t new_size);
+void* alloc(void* ptr, size_t new_size);
 
 #endif  //EVE_MEMORY_H

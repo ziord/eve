@@ -86,7 +86,12 @@ inline static void print_stack(VM* vm) {
 }
 
 VM new_vm() {
-  VM vm = {.fp = NULL, .objects = NULL, .sp = NULL, .frame_count = 0};
+  VM vm = {
+      .fp = NULL,
+      .objects = NULL,
+      .sp = NULL,
+      .frame_count = 0,
+      .upvalues = NULL};
   hashmap_init(&vm.strings);
   hashmap_init(&vm.globals);
   return vm;
@@ -249,6 +254,43 @@ inline static bool call_value(VM* vm, Value val, int argc) {
   return false;
 }
 
+inline static ObjUpvalue* capture_upvalue(VM* vm, Value* position) {
+  ObjUpvalue *current = vm->upvalues, *previous = NULL;
+  while (current != NULL && current->location > position) {
+    previous = current;
+    current = current->next;
+  }
+  // if the location is already captured, return the upvalue
+  if (current && current->location == position) {
+    return current;
+  }
+
+  ObjUpvalue* new_uv = create_upvalue(vm, position);
+  new_uv->next = current;  // enables sorting of the locations
+  if (previous == NULL) {  // if head is empty
+    vm->upvalues = new_uv;
+  } else {
+    /*
+     * if all the captured locations are above 'position'
+     * | p | x | x | x |
+     * or if we passed 'position' during our search
+     * | x | p | x | x |
+     */
+    previous->next = new_uv;
+  }
+  return new_uv;
+}
+
+inline static void close_upvalues(VM* vm, const Value* slot) {
+  ObjUpvalue* current = vm->upvalues;
+  while (current != NULL && current->location >= slot) {
+    current->value = *current->location;
+    current->location = &current->value;
+    current = current->next;
+  }
+  vm->upvalues = current;
+}
+
 IResult run(VM* vm) {
   register byte_t inst;
   for (;;) {
@@ -286,6 +328,10 @@ IResult run(VM* vm) {
         push_stack(vm, vm->fp->stack[READ_BYTE(vm)]);
         break;
       }
+      case $GET_UPVALUE: {
+        push_stack(vm, *vm->fp->closure->env[READ_BYTE(vm)]->location);
+        break;
+      }
       case $SET_GLOBAL: {
         Value var = READ_CONST(vm);
         if (hashmap_put(&vm->globals, vm, var, PEEK_STACK(vm))) {
@@ -300,7 +346,11 @@ IResult run(VM* vm) {
         break;
       }
       case $SET_LOCAL: {
-        vm->stack[READ_BYTE(vm)] = PEEK_STACK(vm);
+        vm->fp->stack[READ_BYTE(vm)] = PEEK_STACK(vm);
+        break;
+      }
+      case $SET_UPVALUE: {
+        *vm->fp->closure->env[READ_BYTE(vm)]->location = PEEK_STACK(vm);
         break;
       }
       case $SET_SUBSCRIPT: {
@@ -318,6 +368,8 @@ IResult run(VM* vm) {
           return RESULT_SUCCESS;
         }
         Value ret_val = pop_stack(vm);
+        // close all upvalues currently still unclosed
+        close_upvalues(vm, frame.stack);
         vm->sp = frame.stack;
         push_stack(vm, ret_val);
         break;
@@ -496,7 +548,21 @@ IResult run(VM* vm) {
       case $BUILD_CLOSURE: {
         Value val = READ_CONST(vm);
         ObjClosure* closure = create_closure(vm, AS_FUNC(val));
+        for (int i = 0; i < closure->env_len; i++) {
+          byte_t index = READ_BYTE(vm);
+          byte_t is_local = READ_BYTE(vm);
+          if (is_local) {
+            closure->env[i] = capture_upvalue(vm, vm->fp->stack + index);
+          } else {
+            closure->env[i] = vm->fp->closure->env[i];
+          }
+        }
         push_stack(vm, OBJ_VAL(closure));
+        break;
+      }
+      case $CLOSE_UPVALUE: {
+        close_upvalues(vm, vm->sp - 1);
+        pop_stack(vm);
         break;
       }
       case $BW_XOR: {

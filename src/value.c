@@ -59,6 +59,7 @@ char* get_object_type(Obj* obj) {
     case OBJ_HMAP:
       return "hashmap";
     case OBJ_CLOSURE:
+    case OBJ_FN:
       return "function";
     default:
       UNREACHABLE("unknown object type");
@@ -87,6 +88,10 @@ void print_object(Value val, Obj* obj) {
     }
     case OBJ_CLOSURE: {
       printf("{fn %s}", get_func_name(AS_CLOSURE(val)->func));
+      break;
+    }
+    case OBJ_FN: {
+      printf("{fn %s}", get_func_name(AS_FUNC(val)));
       break;
     }
     case OBJ_LIST: {
@@ -154,8 +159,10 @@ void print_object(Value val, Obj* obj) {
       printf("}");
       break;
     }
-    case OBJ_CONTEXT:
-      UNREACHABLE("print_object - context");
+    case OBJ_UPVALUE: {
+      printf("{upvalue}");
+      break;
+    }
     default:
       UNREACHABLE("print: unknown object type");
   }
@@ -277,12 +284,12 @@ void free_object(VM* vm, Obj* obj) {
     }
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)obj;
-      FREE_BUFFER(vm, closure->env, ObjContext*, closure->env_len);
+      FREE_BUFFER(vm, closure->env, ObjUpvalue*, closure->env_len);
       FREE(vm, closure, ObjClosure);
       break;
     }
-    case OBJ_CONTEXT: {
-      FREE(vm, obj, ObjContext);
+    case OBJ_UPVALUE: {
+      FREE(vm, obj, ObjUpvalue);
       break;
     }
   }
@@ -372,8 +379,7 @@ ObjClosure* create_closure(VM* vm, ObjFn* func) {
   ObjClosure* closure =
       CREATE_OBJ(vm, ObjClosure, OBJ_CLOSURE, sizeof(ObjClosure));
   if (func->env_len) {
-    closure->env =
-        GROW_BUFFER(vm, closure->env, ObjContext*, 0, func->env_len);
+    closure->env = GROW_BUFFER(vm, NULL, ObjUpvalue*, 0, func->env_len);
     for (int i = 0; i < func->env_len; i++) {
       closure->env[i] = NULL;
     }
@@ -381,6 +387,14 @@ ObjClosure* create_closure(VM* vm, ObjFn* func) {
   closure->func = func;
   closure->env_len = func->env_len;
   return closure;
+}
+
+ObjUpvalue* create_upvalue(VM* vm, Value* location) {
+  ObjUpvalue* upvalue =
+      CREATE_OBJ(vm, ObjUpvalue, OBJ_UPVALUE, sizeof(ObjUpvalue));
+  upvalue->next = NULL;
+  upvalue->location = location;
+  return upvalue;
 }
 
 inline char* get_func_name(ObjFn* fn) {

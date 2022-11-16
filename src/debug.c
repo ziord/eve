@@ -33,6 +33,24 @@ int jump_instruction(char* inst, Code* code, int offset, int sign) {
   return offset + 3;
 }
 
+int closure_instruction(char* inst, Code* code, int offset) {
+  int slot = code->bytes[offset + 1];
+  ObjFn* fn = AS_FUNC(code->vpool.values[slot]);
+  offset = constant_instruction(inst, code, offset);
+  for (int i = 0; i < fn->env_len; i++) {
+    // index, is_local
+    int uv_index = code->bytes[offset++];
+    bool uv_is_local = code->bytes[offset++];
+    printf(
+        "   |\t%04d\t%-16s\t\t   upvalue  %d  %d\n",
+        offset,
+        " | ",
+        uv_index,
+        uv_is_local);
+  }
+  return offset;
+}
+
 int dis_instruction(Code* code, int index) {
   if (index > 0 && code->lines[index] == code->lines[index - 1]) {
     printf("   |\t%04d\t", index);
@@ -85,6 +103,8 @@ int dis_instruction(Code* code, int index) {
       return plain_instruction("$RET", index);
     case $POP:
       return plain_instruction("$POP", index);
+    case $CLOSE_UPVALUE:
+      return plain_instruction("$CLOSE_UPVALUE", index);
     case $SUBSCRIPT:
       return plain_instruction("$SUBSCRIPT", index);
     case $SET_SUBSCRIPT:
@@ -111,8 +131,12 @@ int dis_instruction(Code* code, int index) {
       return byte_instruction("$POP_N", code, index);
     case $SET_LOCAL:
       return byte_instruction("$SET_LOCAL", code, index);
+    case $SET_UPVALUE:
+      return byte_instruction("$SET_UPVALUE", code, index);
     case $GET_LOCAL:
       return byte_instruction("$GET_LOCAL", code, index);
+    case $GET_UPVALUE:
+      return byte_instruction("$GET_UPVALUE", code, index);
     case $LOAD_CONST:
       return constant_instruction("$LOAD_CONST", code, index);
     case $DEFINE_GLOBAL:
@@ -121,6 +145,8 @@ int dis_instruction(Code* code, int index) {
       return constant_instruction("$GET_GLOBAL", code, index);
     case $SET_GLOBAL:
       return constant_instruction("$SET_GLOBAL", code, index);
+    case $BUILD_CLOSURE:
+      return closure_instruction("$BUILD_CLOSURE", code, index);
     default:
       return plain_instruction("UNKNOWN_OPCODE", index);
   }

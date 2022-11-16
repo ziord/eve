@@ -1,0 +1,103 @@
+fn add_x(x) {
+    return fn (y) {
+        return x + y;
+    };
+}
+
+let adder = add_x(5);
+assert adder(10) == 15;
+assert adder(6) == 11;
+assert adder(7) == 12;
+
+fn list_change(list, dict) {
+    fn push(val_1, val_2) {
+        list[-1] = val_1;
+        dict["any"] = val_2;
+    }
+    return push;
+}
+
+let my_list = [1, 2];
+let my_dict = #{"any": 5};
+let change_last = list_change(my_list, my_dict);
+change_last(5, 12);
+assert my_list[-1] == 5;
+assert my_dict["any"] == 12;
+
+fn capture_10(a, b, c, d, e, f, g, h, i, j) {
+    fn fx() {
+        fn xf() {
+            fn zz() {
+                return fn () {
+                    return a + b + c + d + e + f + g + h + i + j;
+                };
+            }
+            return zz;
+        }
+        return xf;
+    }
+    return fx;
+}
+
+
+let step1 = capture_10(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)();
+let step2 = step1()();
+assert step2() == 55;
+
+
+fn A() {
+    let x = 10;
+    return fn () {
+        let y = 1;
+        while y < x {
+            y += x;
+            if y % 2 == 1 {
+                break;
+            }
+        }
+        return y;
+    };
+}
+
+assert A()() == 11;
+
+fn B() {
+    let fox = None;
+    while true {
+        let x = 5;
+        fox = fn() {
+            return x + 5;
+        };
+        x += 1;
+        if x >= 6 {
+            break;
+        }
+    }
+    return fox;
+}
+
+assert B()() == 11;
+
+fn loop_capture() {
+    let list = [0x2, 0x3, 0x4, 0x5, 0x6];
+    let rets = [None, None, None, None, None];
+    let j = 0;
+    while j < 5 {
+        let i = list[j];
+        rets[j] = fn () { return i; };
+        j += 1;
+    }
+    return rets;
+}
+
+let vals = loop_capture();
+let checks = [0x2, 0x3, 0x4, 0x5, 0x6];
+let x = 0;
+while x < 5 {
+    assert vals[x]() == checks[x];
+    x += 1;
+}
+
+
+let y = x = 10;
+assert y == x && x == 10;

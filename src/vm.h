@@ -30,6 +30,7 @@ typedef struct VM {
   CallFrame frames[FRAME_MAX];
   CallFrame* fp;
   Value* sp;
+  ObjUpvalue* upvalues;
   Obj* objects;
 } VM;
 

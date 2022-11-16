@@ -84,7 +84,7 @@ typedef enum {
   OBJ_HMAP,
   OBJ_FN,
   OBJ_CLOSURE,
-  OBJ_CONTEXT,
+  OBJ_UPVALUE,
 } ObjTy;
 
 typedef struct Obj {
@@ -124,14 +124,14 @@ typedef struct {
   ObjString* name;
 } ObjFn;
 
-typedef struct ObjContext {
+typedef struct ObjUpvalue {
   Obj obj;
   Value* location;
   Value value;
-  struct ObjContext* next;
-} ObjContext;
+  struct ObjUpvalue* next;
+} ObjUpvalue;
 
-typedef ObjContext** Env;
+typedef ObjUpvalue** Env;
 
 typedef struct {
   Obj obj;
@@ -175,6 +175,7 @@ ObjList* create_list(VM* vm, int len);
 ObjHashMap* create_hashmap(VM* vm);
 ObjFn* create_function(VM* vm);
 ObjClosure* create_closure(VM* vm, ObjFn* func);
+ObjUpvalue* create_upvalue(VM* vm, Value*);
 char* get_func_name(ObjFn* fn);
 void hashmap_init(ObjHashMap* table);
 bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);

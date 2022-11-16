@@ -44,6 +44,7 @@ Compiler new_compiler(AstNode* node, ObjFn* func, VM* vm) {
       .scope = 0,
       .locals_count = 0,
       .controls_count = 0,
+      .upvalues_count = 0,
       .errors = 0,
       .current_loop = {.scope = 0},
       .enclosing = NULL};
@@ -91,6 +92,28 @@ inline static int add_lvar(Compiler* compiler, VarNode* node) {
   return compiler->locals_count - 1;
 }
 
+inline static int
+add_upvalue(Compiler* compiler, int index, bool is_local) {
+  if (compiler->upvalues_count >= CONST_MAX) {
+    compile_error(
+        compiler,
+        "Too many closure captures. Max allowed is: %d",
+        CONST_MAX);
+    return -1;
+  }
+  Upvalue* upvalue;
+  // ensure we do not add duplicate entries for the same upvalue, to preserve space
+  for (int i = 0; i < compiler->upvalues_count; i++) {
+    upvalue = &compiler->upvalues[i];
+    if (upvalue->index == index && upvalue->is_local == is_local) {
+      return i;
+    }
+  }
+  compiler->upvalues[compiler->upvalues_count] =
+      (Upvalue) {.index = index, .is_local = is_local};
+  return compiler->upvalues_count++;
+}
+
 inline static int init_lvar(Compiler* compiler, VarNode* node) {
   int index = add_lvar(compiler, node);
   compiler->locals[index].initialized = true;
@@ -115,21 +138,37 @@ inline static int find_lvar(Compiler* compiler, VarNode* node) {
   return -1;
 }
 
-inline static void pop_locals(Compiler* compiler, int line) {
-  int pops = 0;
-  for (int i = compiler->locals_count - 1; i >= 0; i--) {
-    if (compiler->locals[i].scope > compiler->scope) {
-      pops++;
+inline static int find_upvalue(Compiler* compiler, VarNode* node) {
+  if (!compiler->enclosing) {
+    return -1;
+  }
+  int index = find_lvar(compiler->enclosing, node);
+  if (index != -1) {
+    compiler->enclosing->locals[index].is_captured = true;
+    index = add_upvalue(compiler, index, true);
+  } else {
+    // find upvalues in higher nested functions, and propagate downwards
+    index = find_upvalue(compiler->enclosing, node);
+    if (index != -1) {
+      index = add_upvalue(compiler, index, false);
     }
   }
-  if (pops) {
-    if (pops > 1) {
-      emit_byte(compiler, $POP_N, line);
-      emit_byte(compiler, (byte_t)pops, line);
-    } else {
-      emit_byte(compiler, $POP, line);
+  return index;
+}
+
+inline static void pop_locals(Compiler* compiler, int line) {
+  // TODO: 'pop' optimizations
+  LocalVar* lvar;
+  for (int i = compiler->locals_count - 1; i >= 0; i--) {
+    lvar = &compiler->locals[i];
+    if (lvar->scope > compiler->scope) {
+      if (lvar->is_captured) {
+        emit_byte(compiler, $CLOSE_UPVALUE, line);
+      } else {
+        emit_byte(compiler, $POP, line);
+      }
+      compiler->locals_count--;
     }
-    compiler->locals_count -= pops;
   }
 }
 
@@ -295,6 +334,9 @@ void c_var(Compiler* compiler, AstNode* node) {
     }
     emit_byte(compiler, $GET_LOCAL, var->line);
     emit_byte(compiler, (byte_t)index, var->line);
+  } else if ((index = find_upvalue(compiler, var)) != -1) {
+    emit_byte(compiler, $GET_UPVALUE, var->line);
+    emit_byte(compiler, (byte_t)index, var->line);
   } else {
     byte_t slot = store_variable(compiler, var);
     emit_byte(compiler, $GET_GLOBAL, var->line);
@@ -307,6 +349,9 @@ void c_var_assign(Compiler* compiler, BinaryNode* assign) {
   int slot = find_lvar(compiler, &assign->l_node->var);
   if (slot != -1) {
     emit_byte(compiler, $SET_LOCAL, assign->line);
+    emit_byte(compiler, (byte_t)slot, assign->line);
+  } else if ((slot = find_upvalue(compiler, &assign->l_node->var)) != -1) {
+    emit_byte(compiler, $SET_UPVALUE, assign->line);
     emit_byte(compiler, (byte_t)slot, assign->line);
   } else {
     // globals
@@ -403,17 +448,20 @@ void c_control_stmt(Compiler* compiler, AstNode* node) {
    * }
    * <-> break_point
    */
-  int pops = 0;
-  for (int i = compiler->locals_count - 1; i >= 0; i--) {
-    if (compiler->locals[i].scope > compiler->current_loop.scope) {
-      pops++;
-    }
-  }
+  LocalVar* lvar;
   int line = node->control_stmt.line;
-  // pop locals (if any) before exiting the loop via break or continue
-  if (pops) {
-    emit_byte(compiler, $POP_N, line);
-    emit_byte(compiler, (byte_t)pops, line);
+  for (int i = compiler->locals_count - 1; i >= 0; i--) {
+    lvar = &compiler->locals[i];
+    // pop locals (if any) before exiting the loop via break or continue
+    if (lvar->scope > compiler->current_loop.scope) {
+      if (lvar->is_captured) {
+        // also, handle upvalues, that is, ensure they're
+        // converted/closed before going off the stack
+        emit_byte(compiler, $CLOSE_UPVALUE, line);
+      } else {
+        emit_byte(compiler, $POP, line);
+      }
+    }
   }
   // use the next slot offset which would later contain the jump instruction
   node->control_stmt.patch_slot = compiler->func->code.length;
@@ -472,7 +520,15 @@ void c_func(Compiler* compiler, AstNode* node) {
   } else {
     // local function
     // set as initialized for functions with recursive calls
-    init_lvar(compiler, &func->name->var);
+    if (func->name) {
+      init_lvar(compiler, &func->name->var);
+      fn_obj->name = AS_STRING(create_string(
+          compiler->vm,
+          &compiler->vm->strings,
+          func->name->var.name,
+          func->name->var.len,
+          false));
+    }
   }
   Compiler func_compiler = new_compiler(node, fn_obj, compiler->vm);
   func_compiler.enclosing = compiler;
@@ -482,10 +538,19 @@ void c_func(Compiler* compiler, AstNode* node) {
     VarNode* param = &func->params[i]->var;
     init_lvar(&func_compiler, param);
   }
-  fn_obj->arity = func->params_count;
   // compile function body
   c_(&func_compiler, func->body);
+  fn_obj->arity = func->params_count;
+  fn_obj->env_len = func_compiler.upvalues_count;
   emit_value(compiler, $BUILD_CLOSURE, OBJ_VAL(fn_obj), func->line);
+  // compile upvalues
+  Upvalue* upvalue;
+  for (int i = 0; i < func_compiler.upvalues_count; i++) {
+    // emit upvalue-index, upvalue-is_local
+    upvalue = &func_compiler.upvalues[i];
+    emit_byte(compiler, (byte_t)upvalue->index, last_line(compiler));
+    emit_byte(compiler, (byte_t)upvalue->is_local, last_line(compiler));
+  }
   if (emit_name && name_slot != -1) {
     emit_byte(compiler, $DEFINE_GLOBAL, func->line);
     emit_byte(compiler, name_slot, func->line);

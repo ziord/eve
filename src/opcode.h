@@ -52,6 +52,7 @@ typedef enum {
   $ASSERT,
   $LOOP,
   $CALL,
+  $TAIL_CALL,
   $RET
 } OpCode;
 

@@ -1,0 +1,35 @@
+#* Eve supports a very limited/restricted form of tail calls *#
+
+fn check(x) {
+    if x >= 50 {
+        return x;
+    }
+    return check(x+1);
+}
+
+fn fib(n, a, b) {
+    if n == 0 {
+        return a;
+    } else if n == 1 {
+        return b;
+    }
+    return fib(n - 1, b, a + b);
+}
+
+assert check(1) == 50;
+assert fib(10, 0, 1) == 55;
+
+let y = None;
+
+fn check2(x) {
+    if x >= 50 {
+        return x;
+    }
+    y = fn () {
+        return x;
+    };
+    return check2(x*2);
+}
+
+assert check2(3) == 96;
+assert y() == 48, "last captured 'x' should be 48";

@@ -185,6 +185,7 @@ typedef struct {
 
 typedef struct {
   AstTy type;
+  bool is_tail_call;
   int line;
   int args_count;
   AstNode* args[CONST_MAX];

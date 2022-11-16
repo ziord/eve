@@ -345,7 +345,7 @@ AstNode* handle_aug_assign(
   return node;
 }
 
-static void set_return(Parser* parser, BlockStmtNode* node) {
+static AstNode* set_return(Parser* parser, BlockStmtNode* node) {
   AstNode *last = NULL, *ret = NULL;
   int line;
   if (node->stmts.len) {
@@ -363,7 +363,31 @@ static void set_return(Parser* parser, BlockStmtNode* node) {
         .line = line,
         .expr = new_none(&parser->store, line)};
     vec_push(&node->stmts, ret);
+  } else {
+    ret = last;
   }
+  return ret;
+}
+
+inline static void can_tco(FuncNode* func, AstNode* ret_node) {
+  // check if a function can be tail-call-optimized
+  // this is a very limited/restricted tco check
+  if (!func->name)
+    return;
+  ExprStmtNode* node = &ret_node->expr_stmt;
+  if (node->expr->num.type != AST_CALL)
+    return;
+  CallNode* call = &node->expr->call;
+  if (call->left->num.type != AST_VAR)
+    return;
+  VarNode* fn_name = &call->left->var;
+  if (fn_name->len != func->name->var.len
+      || memcmp(fn_name->name, func->name->var.name, fn_name->len) != 0) {
+    return;
+  }
+  // TODO: There might have to be a restriction on the number of
+  //       arguments the tco function is allowed to have
+  call->is_tail_call = true;
 }
 
 static AstNode* parse_num(Parser* parser, bool assignable) {
@@ -527,6 +551,7 @@ static AstNode* parse_call(Parser* parser, AstNode* left, bool assignable) {
       .type = AST_CALL,
       .line = parser->previous_tk.line,
       .left = left,
+      .is_tail_call = false,
       .args_count = 0};
   Token tok;
   while (!is_tty(parser, TK_RBRACK) && !is_tty(parser, TK_EOF)) {
@@ -880,7 +905,8 @@ static AstNode* parse_func_decl(Parser* parser, bool is_lambda) {
   consume(parser, TK_RBRACK);
   // body
   node->func.body = parse_block_stmt(parser);
-  set_return(parser, &node->func.body->block_stmt);
+  AstNode* ret_node = set_return(parser, &node->func.body->block_stmt);
+  can_tco(&node->func, ret_node);
   parser->func--;
   return node;
 }

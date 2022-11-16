@@ -498,11 +498,14 @@ void c_call(Compiler* compiler, AstNode* node) {
   for (int i = 0; i < call_node->args_count; i++) {
     c_(compiler, call_node->args[i]);
   }
-  emit_byte(compiler, $CALL, call_node->line);
+  emit_byte(
+      compiler,
+      call_node->is_tail_call ? $TAIL_CALL : $CALL,
+      call_node->line);
   emit_byte(compiler, CAST(byte_t, call_node->args_count), call_node->line);
 }
 
-void c_func(Compiler* compiler, AstNode* node) {
+void c_function(Compiler* compiler, AstNode* node) {
   // let func = fn () {..} | fn func() {...}
   FuncNode* func = &node->func;
   // create a new compiler for the function
@@ -628,7 +631,7 @@ void c_(Compiler* compiler, AstNode* node) {
       c_control_stmt(compiler, node);
       break;
     case AST_FUNC:
-      c_func(compiler, node);
+      c_function(compiler, node);
       break;
     case AST_RETURN_STMT:
       c_return(compiler, node);

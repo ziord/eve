@@ -125,6 +125,8 @@ int dis_instruction(Code* code, int index) {
       return byte_instruction("$BUILD_MAP", code, index);
     case $CALL:
       return byte_instruction("$CALL", code, index);
+    case $TAIL_CALL:
+      return byte_instruction("$TAIL_CALL", code, index);
     case $DISPLAY:
       return byte_instruction("$DISPLAY", code, index);
     case $POP_N:

@@ -44,6 +44,7 @@
   }
 
 static IResult runtime_error(VM* vm, char* fmt, ...);
+inline static void close_upvalues(VM* vm, const Value* slot);
 
 inline static Value pop_stack(VM* vm) {
   return *(--vm->sp);
@@ -231,15 +232,26 @@ perform_subscript_assign(VM* vm, Value var, Value subscript, Value value) {
   return false;
 }
 
-inline static bool call_value(VM* vm, Value val, int argc) {
+inline static bool call_value(VM* vm, Value val, int argc, bool is_tco) {
   if (IS_CLOSURE(val)) {
     ObjFn* fn = AS_CLOSURE(val)->func;
     if (argc == fn->arity) {
-      CallFrame frame = {
-          .closure = AS_CLOSURE(val),
-          .stack = vm->sp - 1 - argc,
-          .ip = fn->code.bytes};
-      push_frame(vm, frame);
+      if (!is_tco) {
+        CallFrame frame = {
+            .closure = AS_CLOSURE(val),
+            .stack = vm->sp - 1 - argc,
+            .ip = fn->code.bytes};
+        push_frame(vm, frame);
+      } else {
+        // close all upvalues currently still unclosed
+        close_upvalues(vm, vm->fp->stack);
+        int j = 0;
+        for (int i = argc; i >= 0; i--, j++) {
+          vm->fp->stack[j] = PEEK_STACK_AT(vm, i);
+        }
+        vm->sp = vm->fp->stack + j;
+        vm->fp->ip = fn->code.bytes;
+      }
       return true;
     }
     runtime_error(
@@ -374,9 +386,14 @@ IResult run(VM* vm) {
         push_stack(vm, ret_val);
         break;
       }
+      case $TAIL_CALL:
       case $CALL: {
         int argc = READ_BYTE(vm);
-        if (!call_value(vm, PEEK_STACK_AT(vm, argc), argc)) {
+        if (!call_value(
+                vm,
+                PEEK_STACK_AT(vm, argc),
+                argc,
+                inst == $TAIL_CALL)) {
           return RESULT_RUNTIME_ERROR;
         }
         break;

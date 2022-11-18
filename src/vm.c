@@ -361,12 +361,12 @@ IResult run(VM* vm) {
     switch (inst) {
       case $LOAD_CONST: {
         push_stack(vm, READ_CONST(vm));
-        break;
+        continue;
       }
       case $DEFINE_GLOBAL: {
         Value var = READ_CONST(vm);
         hashmap_put(&vm->globals, vm, var, pop_stack(vm));
-        break;
+        continue;
       }
       case $GET_GLOBAL: {
         Value var = READ_CONST(vm);
@@ -379,15 +379,15 @@ IResult run(VM* vm) {
               "Name '%s' is not defined",
               AS_STRING(var)->str);
         }
-        break;
+        continue;
       }
       case $GET_LOCAL: {
         push_stack(vm, vm->fp->stack[READ_BYTE(vm)]);
-        break;
+        continue;
       }
       case $GET_UPVALUE: {
         push_stack(vm, *vm->fp->closure->env[READ_BYTE(vm)]->location);
-        break;
+        continue;
       }
       case $SET_GLOBAL: {
         Value var = READ_CONST(vm);
@@ -400,15 +400,15 @@ IResult run(VM* vm) {
               "use of undefined variable '%s'",
               str->str);
         }
-        break;
+        continue;
       }
       case $SET_LOCAL: {
         vm->fp->stack[READ_BYTE(vm)] = PEEK_STACK(vm);
-        break;
+        continue;
       }
       case $SET_UPVALUE: {
         *vm->fp->closure->env[READ_BYTE(vm)]->location = PEEK_STACK(vm);
-        break;
+        continue;
       }
       case $SET_SUBSCRIPT: {
         Value subscript = pop_stack(vm);
@@ -417,7 +417,7 @@ IResult run(VM* vm) {
         if (!perform_subscript_assign(vm, var, subscript, value)) {
           return RESULT_RUNTIME_ERROR;
         }
-        break;
+        continue;
       }
       case $RET: {
         CallFrame frame = pop_frame(vm);
@@ -429,7 +429,7 @@ IResult run(VM* vm) {
         close_upvalues(vm, frame.stack);
         vm->sp = frame.stack;
         push_stack(vm, ret_val);
-        break;
+        continue;
       }
       case $TAIL_CALL:
       case $CALL: {
@@ -441,39 +441,39 @@ IResult run(VM* vm) {
                 inst == $TAIL_CALL)) {
           return RESULT_RUNTIME_ERROR;
         }
-        break;
+        continue;
       }
       case $ADD: {
         BINARY_OP(vm, +, NUMBER_VAL)
-        break;
+        continue;
       }
       case $SUBTRACT: {
         BINARY_OP(vm, -, NUMBER_VAL)
-        break;
+        continue;
       }
       case $DIVIDE: {
         BINARY_OP(vm, /, NUMBER_VAL)
-        break;
+        continue;
       }
       case $MULTIPLY: {
         BINARY_OP(vm, *, NUMBER_VAL)
-        break;
+        continue;
       }
       case $LESS: {
         BINARY_OP(vm, <, BOOL_VAL);
-        break;
+        continue;
       }
       case $GREATER: {
         BINARY_OP(vm, >, BOOL_VAL);
-        break;
+        continue;
       }
       case $LESS_OR_EQ: {
         BINARY_OP(vm, <=, BOOL_VAL);
-        break;
+        continue;
       }
       case $GREATER_OR_EQ: {
         BINARY_OP(vm, >=, BOOL_VAL);
-        break;
+        continue;
       }
       case $POW: {
         Value b = pop_stack(vm);
@@ -481,7 +481,7 @@ IResult run(VM* vm) {
         BINARY_CHECK(vm, **, a, b, IS_NUMBER);
         double res = pow(AS_NUMBER(a), AS_NUMBER(b));
         push_stack(vm, NUMBER_VAL(res));
-        break;
+        continue;
       }
       case $MOD: {
         Value b = pop_stack(vm);
@@ -489,44 +489,44 @@ IResult run(VM* vm) {
         BINARY_CHECK(vm, %, a, b, IS_NUMBER);
         double res = fmod(AS_NUMBER(a), AS_NUMBER(b));
         push_stack(vm, NUMBER_VAL(res));
-        break;
+        continue;
       }
       case $NOT: {
         Value v = pop_stack(vm);
         push_stack(vm, BOOL_VAL(value_falsy(v)));
-        break;
+        continue;
       }
       case $NEGATE: {
         Value v = pop_stack(vm);
         UNARY_CHECK(vm, -, v, IS_NUMBER);
         push_stack(vm, NUMBER_VAL(-AS_NUMBER(v)));
-        break;
+        continue;
       }
       case $BW_INVERT: {
         Value v = pop_stack(vm);
         UNARY_CHECK(vm, ~, v, IS_NUMBER);
         push_stack(vm, NUMBER_VAL((~(int64_t)AS_NUMBER(v))));
-        break;
+        continue;
       }
       case $EQ: {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
         push_stack(vm, BOOL_VAL(value_equal(a, b)));
-        break;
+        continue;
       }
       case $NOT_EQ: {
         Value b = pop_stack(vm);
         Value a = pop_stack(vm);
         push_stack(vm, BOOL_VAL(!value_equal(a, b)));
-        break;
+        continue;
       }
       case $POP: {
         pop_stack(vm);
-        break;
+        continue;
       }
       case $POP_N: {
         vm->sp -= READ_BYTE(vm);
-        break;
+        continue;
       }
       case $SUBSCRIPT: {
         Value subscript = pop_stack(vm);
@@ -534,7 +534,7 @@ IResult run(VM* vm) {
         if (!perform_subscript(vm, val, subscript)) {
           return RESULT_RUNTIME_ERROR;
         }
-        break;
+        continue;
       }
       case $GET_PROPERTY: {
         Value property = READ_CONST(vm);
@@ -542,7 +542,7 @@ IResult run(VM* vm) {
         if (!perform_prop_access(vm, value, property)) {
           return RESULT_RUNTIME_ERROR;
         }
-        break;
+        continue;
       }
       case $SET_PROPERTY: {
         Value property = READ_CONST(vm);
@@ -568,7 +568,7 @@ IResult run(VM* vm) {
               "Cannot set property on type '%s'",
               get_value_type(var));
         }
-        break;
+        continue;
       }
       case $DISPLAY: {  // TODO: remove
         byte_t len = READ_BYTE(vm);
@@ -580,7 +580,7 @@ IResult run(VM* vm) {
         }
         printf("\n");
         vm->sp -= len;
-        break;
+        continue;
       }
       case $ASSERT: {
         Value test = pop_stack(vm);
@@ -591,19 +591,19 @@ IResult run(VM* vm) {
               "Assertion Failed: %s",
               AS_STRING(value_to_string(vm, msg))->str);
         }
-        break;
+        continue;
       }
       case $JMP: {
         uint16_t offset = READ_SHORT(vm);
         vm->fp->ip += offset;
-        break;
+        continue;
       }
       case $JMP_FALSE: {
         uint16_t offset = READ_SHORT(vm);
         if (value_falsy(PEEK_STACK(vm))) {
           vm->fp->ip += offset;
         }
-        break;
+        continue;
       }
       case $JMP_FALSE_OR_POP: {
         uint16_t offset = READ_SHORT(vm);
@@ -612,12 +612,12 @@ IResult run(VM* vm) {
         } else {
           pop_stack(vm);
         }
-        break;
+        continue;
       }
       case $LOOP: {
         uint16_t offset = READ_SHORT(vm);
         vm->fp->ip -= offset;
-        break;
+        continue;
       }
       case $BUILD_LIST: {
         ObjList* list = create_list(vm, READ_BYTE(vm));
@@ -626,7 +626,7 @@ IResult run(VM* vm) {
         }
         vm->sp -= list->elems.length;
         push_stack(vm, OBJ_VAL(list));
-        break;
+        continue;
       }
       case $BUILD_MAP: {
         uint32_t len = READ_BYTE(vm) * 2;
@@ -639,7 +639,7 @@ IResult run(VM* vm) {
         }
         vm->sp -= len;
         push_stack(vm, OBJ_VAL(map));
-        break;
+        continue;
       }
       case $BUILD_CLOSURE: {
         Value val = READ_CONST(vm);
@@ -654,7 +654,7 @@ IResult run(VM* vm) {
           }
         }
         push_stack(vm, OBJ_VAL(closure));
-        break;
+        continue;
       }
       case $BUILD_STRUCT: {
         Value name = READ_CONST(vm);
@@ -674,7 +674,7 @@ IResult run(VM* vm) {
         }
         vm->sp -= field_count;
         push_stack(vm, OBJ_VAL(strukt));
-        break;
+        continue;
       }
       case $BUILD_INSTANCE: {
         Value var = pop_stack(vm);
@@ -704,12 +704,12 @@ IResult run(VM* vm) {
         }
         vm->sp -= field_count;
         push_stack(vm, OBJ_VAL(instance));
-        break;
+        continue;
       }
       case $CLOSE_UPVALUE: {
         close_upvalues(vm, vm->sp - 1);
         pop_stack(vm);
-        break;
+        continue;
       }
       case $BW_XOR: {
         Value b = pop_stack(vm);
@@ -718,7 +718,7 @@ IResult run(VM* vm) {
         push_stack(
             vm,
             NUMBER_VAL(((int64_t)AS_NUMBER(a) ^ (int64_t)AS_NUMBER(b))));
-        break;
+        continue;
       }
       case $BW_OR: {
         Value b = pop_stack(vm);
@@ -727,7 +727,7 @@ IResult run(VM* vm) {
         push_stack(
             vm,
             NUMBER_VAL(((int64_t)AS_NUMBER(a) | (int64_t)AS_NUMBER(b))));
-        break;
+        continue;
       }
       case $BW_AND: {
         Value b = pop_stack(vm);
@@ -736,7 +736,7 @@ IResult run(VM* vm) {
         push_stack(
             vm,
             NUMBER_VAL(((int64_t)AS_NUMBER(a) & (int64_t)AS_NUMBER(b))));
-        break;
+        continue;
       }
       case $BW_LSHIFT: {
         Value b = pop_stack(vm);
@@ -746,7 +746,7 @@ IResult run(VM* vm) {
             vm,
             NUMBER_VAL(
                 (double)((int64_t)AS_NUMBER(a) << (int64_t)AS_NUMBER(b))));
-        break;
+        continue;
       }
       case $BW_RSHIFT: {
         Value b = pop_stack(vm);
@@ -756,7 +756,7 @@ IResult run(VM* vm) {
             vm,
             NUMBER_VAL(
                 (double)((int64_t)AS_NUMBER(a) >> (int64_t)AS_NUMBER(b))));
-        break;
+        continue;
       }
       default:
         UNREACHABLE("unknown opcode");

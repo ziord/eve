@@ -163,6 +163,10 @@ void print_object(Value val, Obj* obj) {
       printf("{upvalue}");
       break;
     }
+    case OBJ_STRUCT: {
+      printf("{struct %s}", AS_STRUCT(val)->name->str);
+      break;
+    }
     default:
       UNREACHABLE("print: unknown object type");
   }
@@ -215,10 +219,17 @@ Value object_to_string(VM* vm, Value val) {
       return (create_string(vm, &vm->strings, buff, len, false));
     }
     case OBJ_CLOSURE: {
-      ObjString* name = AS_CLOSURE(val)->func->name;
-      int len = 10 + (name ? name->length : 3);
+      ObjFn* fn = AS_CLOSURE(val)->func;
+      int len = 10 + (fn->name ? fn->name->length : 3);
       char buff[len];
-      len = snprintf(buff, len, "@fn[%s]", name ? name->str : "<>");
+      len = snprintf(buff, len, "@fn[%s]", get_func_name(fn));
+      return (create_string(vm, &vm->strings, buff, len, false));
+    }
+    case OBJ_STRUCT: {
+      ObjString* name = AS_STRUCT(val)->name;
+      int len = 10 + name->length;
+      char buff[len];
+      len = snprintf(buff, len, "@struct[%s]", name->str);
       return (create_string(vm, &vm->strings, buff, len, false));
     }
     default:
@@ -290,6 +301,10 @@ void free_object(VM* vm, Obj* obj) {
     }
     case OBJ_UPVALUE: {
       FREE(vm, obj, ObjUpvalue);
+      break;
+    }
+    case OBJ_STRUCT: {
+      FREE(vm, obj, ObjStruct);
       break;
     }
   }
@@ -395,6 +410,14 @@ ObjUpvalue* create_upvalue(VM* vm, Value* location) {
   upvalue->next = NULL;
   upvalue->location = location;
   return upvalue;
+}
+
+ObjStruct* create_struct(VM* vm, ObjString* name) {
+  ObjStruct* strukt =
+      CREATE_OBJ(vm, ObjStruct, OBJ_STRUCT, sizeof(ObjStruct));
+  hashmap_init(&strukt->fields);
+  strukt->name = name;
+  return strukt;
 }
 
 inline char* get_func_name(ObjFn* fn) {

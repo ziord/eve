@@ -31,6 +31,7 @@ typedef enum {
   TK_LCURLY,        // {
   TK_RCURLY,        // }
   TK_HASH,          // #
+  TK_AT,            // @
   TK_COLON,         // :
   TK_SEMI_COLON,    // ;
   TK_PIPE_PIPE,     // ||
@@ -41,6 +42,7 @@ typedef enum {
   TK_EQ_EQ,         // ==
   TK_LSHIFT,        // >>
   TK_RSHIFT,        // <<
+  TK_ARROW,         // =>
   TK_FALSE,         // false
   TK_TRUE,          // true
   TK_NONE,          // None
@@ -54,6 +56,7 @@ typedef enum {
   TK_BREAK,         // break
   TK_CONTINUE,      // continue
   TK_RETURN,        // return
+  TK_STRUCT,        // struct
   TK_IDENT,         // identifier
   TK_STRING,        // "..."
   TK_EOF,           // EOF

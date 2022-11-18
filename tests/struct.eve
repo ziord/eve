@@ -1,0 +1,21 @@
+struct Foo {
+  @compose: x;
+  @compose y, z;
+  @declare p => 500;
+  @declare q => 60, v => "foxy";
+}
+
+{
+
+    struct Bar {
+      @compose: x;
+      @compose y, z;
+      @declare q => 60, v => "foxy";
+    }
+    assert Bar;
+    assert Bar != Foo;
+
+}
+
+show Foo;
+assert Foo && Foo == Foo;

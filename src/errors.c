@@ -17,5 +17,8 @@ Error error_types[] = {
   [E0010] = {.err_msg = "Maximum number of arguments exceeded.", .hlp_msg = "Max allowed is %d"},
   [E0011] = {.err_msg = "Duplicate argument '%.*s' in function definition.", .hlp_msg = "A function parameter's name must be unique"},
   [E0012] = {.err_msg = "Maximum number of parameters exceeded.", .hlp_msg = "Max allowed is %d"},
+  [E0013] = {.err_msg = "Invalid meta-type", .hlp_msg = "Examples of valid meta-types include @compose, @declare, etc."},
+  [E0014] = {.err_msg = "Meta-type missing identifier", .hlp_msg = "Include an identifier after the meta-type"},
+  [E0015] = {.err_msg = "Maximum number of fields exceeded.", .hlp_msg = "Max allowed is %d"},
 };
 // clang-format on

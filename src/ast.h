@@ -52,6 +52,7 @@ typedef enum {
   AST_RETURN_STMT,
   AST_VAR_DECL,
   AST_FUNC,
+  AST_STRUCT,
   AST_CALL,
   AST_PROGRAM,
 } AstTy;
@@ -192,6 +193,26 @@ typedef struct {
   AstNode* left;
 } CallNode;
 
+typedef enum {
+  SM_NIL,
+  SM_COMPOSE,
+  SM_DECLARE,
+} StructMetaTy;
+
+typedef struct {
+  StructMetaTy type;
+  Token var;
+  AstNode* expr;  // may be NULL, depending on type
+} StructMeta;
+
+typedef struct {
+  AstTy type;
+  int line;
+  int field_count;
+  AstNode* name;
+  StructMeta fields[CONST_MAX];
+} StructNode;
+
 typedef struct {
   AstTy type;
   Vec decls;
@@ -208,6 +229,7 @@ union AstNode {
   VarNode var;
   FuncNode func;
   CallNode call;
+  StructNode strukt;
   SubscriptNode subscript;
   ExprStmtNode expr_stmt;
   ShowStmtNode show_stmt;

@@ -46,12 +46,14 @@ typedef uint64_t Value;
 #define IS_HMAP(val) (is_object_type(val, OBJ_HMAP))
 #define IS_FUNC(val) (is_object_type(val, OBJ_FN))
 #define IS_CLOSURE(val) (is_object_type(val, OBJ_CLOSURE))
+#define IS_STRUCT(val) (is_object_type(val, OBJ_STRUCT))
 
 #define AS_STRING(val) ((ObjString*)(AS_OBJ(val)))
 #define AS_LIST(val) ((ObjList*)(AS_OBJ(val)))
 #define AS_HMAP(val) ((ObjHashMap*)(AS_OBJ(val)))
 #define AS_FUNC(val) ((ObjFn*)(AS_OBJ(val)))
 #define AS_CLOSURE(val) ((ObjClosure*)(AS_OBJ(val)))
+#define AS_STRUCT(val) ((ObjStruct*)(AS_OBJ(val)))
 
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
@@ -85,6 +87,7 @@ typedef enum {
   OBJ_FN,
   OBJ_CLOSURE,
   OBJ_UPVALUE,
+  OBJ_STRUCT,
 } ObjTy;
 
 typedef struct Obj {
@@ -140,6 +143,18 @@ typedef struct {
   Env env;
 } ObjClosure;
 
+typedef struct {
+  Obj obj;
+  ObjHashMap fields;
+  ObjString* name;
+} ObjStruct;
+
+typedef struct {
+  Obj obj;
+  ObjHashMap fields;
+  ObjStruct* strukt;  // TODO: possibly do not need this now
+} ObjInstance;
+
 inline static Value num_to_val(double num) {
   return *((Value*)&(num));
 }
@@ -176,6 +191,7 @@ ObjHashMap* create_hashmap(VM* vm);
 ObjFn* create_function(VM* vm);
 ObjClosure* create_closure(VM* vm, ObjFn* func);
 ObjUpvalue* create_upvalue(VM* vm, Value*);
+ObjStruct* create_struct(VM* vm, ObjString* name);
 char* get_func_name(ObjFn* fn);
 void hashmap_init(ObjHashMap* table);
 bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);

@@ -577,6 +577,26 @@ IResult run(VM* vm) {
         push_stack(vm, OBJ_VAL(closure));
         break;
       }
+      case $BUILD_STRUCT: {
+        Value name = READ_CONST(vm);
+        byte_t field_count = READ_BYTE(vm) * 2;  // k-v pairs
+        ObjStruct* strukt = create_struct(vm, AS_STRING(name));
+        Value var, val;
+        for (byte_t i = 0; i < field_count; i += 2) {
+          val = PEEK_STACK_AT(vm, i);
+          var = PEEK_STACK_AT(vm, i + 1);
+          if (!hashmap_put(&strukt->fields, vm, var, val)) {
+            return runtime_error(
+                vm,
+                "Duplicate field '%s'\n"
+                "struct fields must be unique irrespective of meta-type",
+                AS_STRING(value_to_string(vm, var))->str);
+          }
+        }
+        vm->sp -= field_count;
+        push_stack(vm, OBJ_VAL(strukt));
+        break;
+      }
       case $CLOSE_UPVALUE: {
         close_upvalues(vm, vm->sp - 1);
         pop_stack(vm);

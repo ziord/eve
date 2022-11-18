@@ -505,6 +505,45 @@ void c_call(Compiler* compiler, AstNode* node) {
   emit_byte(compiler, CAST(byte_t, call_node->args_count), call_node->line);
 }
 
+void c_struct(Compiler* compiler, AstNode* node) {
+  StructNode* struct_n = &node->strukt;
+  /*
+   * struct Foo {
+   *  @declare x => 5, z => 10;
+   *  @compose x, z;
+   *  @compose p;
+   * }
+   * push var
+   * push val
+   * BUILD_STRUCT name-slot field-count
+   */
+  StructMeta* meta;
+  VarNode var;
+  byte_t slot;
+  for (int i = 0; i < struct_n->field_count; i++) {
+    meta = &struct_n->fields[i];
+    // compile var
+    var = (VarNode) {
+        .type = AST_VAR,
+        .name = meta->var.value,
+        .len = meta->var.length,
+        .line = meta->var.line};
+    slot = store_variable(compiler, &var);
+    emit_byte(compiler, $LOAD_CONST, var.line);
+    emit_byte(compiler, slot, var.line);
+    if (meta->expr) {
+      c_(compiler, meta->expr);
+    } else {
+      // use NOTHING as placeholder value
+      emit_value(compiler, $LOAD_CONST, NOTHING_VAL, struct_n->line);
+    }
+  }
+  slot = store_variable(compiler, &struct_n->name->var);
+  emit_byte(compiler, $BUILD_STRUCT, struct_n->line);
+  emit_byte(compiler, slot, struct_n->line);
+  emit_byte(compiler, (byte_t)struct_n->field_count, struct_n->line);
+}
+
 void c_function(Compiler* compiler, AstNode* node) {
   // let func = fn () {..} | fn func() {...}
   FuncNode* func = &node->func;
@@ -638,6 +677,9 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_CALL:
       c_call(compiler, node);
+      break;
+    case AST_STRUCT:
+      c_struct(compiler, node);
       break;
     case AST_PROGRAM:
       c_program(compiler, node);

@@ -93,6 +93,8 @@ ExprParseTable p_table[] = {
   [TK_AMP] = {.bp = BP_BW_AND, .prefix = NULL, .infix = parse_binary},
   [TK_LSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
   [TK_RSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
+  [TK_ARROW] = {.bp = BP_SHIFT, .prefix = NULL, .infix = NULL},
+  [TK_AT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
@@ -105,6 +107,7 @@ ExprParseTable p_table[] = {
   [TK_WHILE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_CONTINUE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_RETURN] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_STRUCT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_BREAK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_IDENT] = {.bp = BP_NONE, .prefix = parse_var, .infix = NULL},
   [TK_STRING] = {.bp = BP_NONE, .prefix = parse_string, .infix = NULL},
@@ -911,6 +914,92 @@ static AstNode* parse_func_decl(Parser* parser, bool is_lambda) {
   return node;
 }
 
+StructMetaTy get_meta_ty(Token token) {
+  // compose
+  // declare
+  switch (*token.value) {
+    case 'c': {
+      if (token.length == 7 && memcmp(token.value, "compose", 7) == 0) {
+        return SM_COMPOSE;
+      }
+      break;
+    }
+    case 'd': {
+      if (token.length == 7 && memcmp(token.value, "declare", 7) == 0) {
+        return SM_DECLARE;
+      }
+      break;
+    }
+  }
+  return SM_NIL;
+}
+
+AstNode* parse_struct_decl(Parser* parser) {
+  /*
+   * structDecl     → "struct" IDENTIFIER "{" ( structBody )* "}" ;
+     structBody     → "@" structMeta ":"? IDENTIFIER ( "," IDENTIFIER )* ";"
+                    | "@" structMeta ":"? IDENTIFIER "=>" expression ( "," IDENTIFIER "=>" expression )* ";" ;
+   */
+  int line = parser->current_tk.line;
+  consume(parser, TK_STRUCT);
+  AstNode* st_name = parse_var(parser, false);
+  AstNode* node = new_node(parser);
+  node->strukt = (StructNode) {
+      .type = AST_STRUCT,
+      .name = st_name,
+      .field_count = 0,
+      .line = line};
+  StructNode* strukt = &node->strukt;
+  consume(parser, TK_LCURLY);
+  while (!is_tty(parser, TK_RCURLY) && !is_tty(parser, TK_EOF)) {
+    int count = 0;
+    consume(parser, TK_AT);
+    // handle meta 'compose' | 'declare'
+    consume(parser, TK_IDENT);
+    StructMetaTy meta_ty = get_meta_ty(parser->previous_tk);
+    if (meta_ty == SM_NIL) {
+      ErrorArgs args = new_error_arg(&parser->previous_tk, NULL, NULL);
+      return parse_error(parser, E0013, &args);
+    }
+    // colon is optional
+    match(parser, TK_COLON);
+    // expect identifier
+    if (!is_tty(parser, TK_IDENT)) {
+      return parse_error(parser, E0014, NULL);
+    }
+    while (!is_tty(parser, TK_SEMI_COLON) && !is_tty(parser, TK_EOF)) {
+      if (count > 0) {
+        consume(parser, TK_COMMA);
+      }
+      Token var = parser->current_tk;
+      consume(parser, TK_IDENT);
+      strukt->fields[strukt->field_count++] =
+          (StructMeta) {.type = meta_ty, .var = var, .expr = NULL};
+      if (meta_ty == SM_DECLARE) {
+        consume(parser, TK_ARROW);
+        strukt->fields[strukt->field_count - 1].expr = parse_expr(parser);
+      }
+      count++;
+      if (strukt->field_count > CONST_MAX) {
+        CREATE_BUFFER(buff, error_types[E0015].hlp_msg, CONST_MAX)
+        ErrorArgs args = new_error_arg(&var, NULL, buff);
+        return parse_error(parser, E0015, &args);
+      }
+    }
+    consume(parser, TK_SEMI_COLON);
+  }
+  consume(parser, TK_RCURLY);
+  // define struct declarations as variable declarations
+  AstNode* decl = new_node(parser);
+  decl->binary = (BinaryNode) {
+      .type = AST_VAR_DECL,
+      .l_node = st_name,
+      .r_node = node,
+      .op = OP_EQ,
+      .line = strukt->line};
+  return decl;
+}
+
 void resync(Parser* parser) {
   parser->panicking = false;
   while (!is_tty(parser, TK_EOF)) {
@@ -933,6 +1022,8 @@ static AstNode* parse_decls(Parser* parser) {
     return parse_var_decl(parser);
   } else if (is_tty(parser, TK_FN)) {
     return parse_func_decl(parser, false);
+  } else if (is_tty(parser, TK_STRUCT)) {
+    return parse_struct_decl(parser);
   }
   return parse_stmt(parser);
 }

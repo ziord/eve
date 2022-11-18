@@ -3,31 +3,59 @@
 #define PEEK(_lex) peek((_lex), 0)
 static inline char get_char(Lexer* lexer);
 char* token_types[] = {
-    [TK_NUM] = "<number>",    [TK_PLUS] = "+",
-    [TK_MINUS] = "-",         [TK_STAR] = "*",
-    [TK_STAR_STAR] = "**",    [TK_EXC_MARK] = "!",
-    [TK_TILDE] = "~",         [TK_FSLASH] = "/",
-    [TK_PERCENT] = "%",       [TK_GRT] = ">",
-    [TK_LESS] = "<",          [TK_EQ] = "=",
-    [TK_AMP] = "&",           [TK_CARET] = "^",
-    [TK_PIPE] = "|",          [TK_COMMA] = ",",
-    [TK_LBRACK] = "(",        [TK_RBRACK] = ")",
-    [TK_LSQ_BRACK] = "[",     [TK_RSQ_BRACK] = "]",
-    [TK_LCURLY] = "{",        [TK_RCURLY] = "}",
-    [TK_HASH] = "#",          [TK_COLON] = ":",
-    [TK_SEMI_COLON] = ";",    [TK_PIPE_PIPE] = "||",
-    [TK_AMP_AMP] = "&&",      [TK_GRT_EQ] = ">=",
-    [TK_LESS_EQ] = "<=",      [TK_NOT_EQ] = "!=",
-    [TK_EQ_EQ] = "==",        [TK_LSHIFT] = ">>",
-    [TK_RSHIFT] = "<<",       [TK_FALSE] = "false",
-    [TK_TRUE] = "true",       [TK_NONE] = "None",
-    [TK_SHOW] = "show",       [TK_IDENT] = "<identifier>",
-    [TK_STRING] = "<string>", [TK_EOF] = "<eof>",
-    [TK_ERROR] = "<error>",   [TK_LET] = "let",
-    [TK_ASSERT] = "assert",   [TK_IF] = "if",
-    [TK_ELSE] = "else",       [TK_WHILE] = "while",
-    [TK_BREAK] = "break",     [TK_CONTINUE] = "continue",
-    [TK_FN] = "fn",           [TK_RETURN] = "return",
+    [TK_NUM] = "<number>",
+    [TK_PLUS] = "+",
+    [TK_MINUS] = "-",
+    [TK_STAR] = "*",
+    [TK_STAR_STAR] = "**",
+    [TK_EXC_MARK] = "!",
+    [TK_TILDE] = "~",
+    [TK_FSLASH] = "/",
+    [TK_PERCENT] = "%",
+    [TK_GRT] = ">",
+    [TK_LESS] = "<",
+    [TK_EQ] = "=",
+    [TK_AMP] = "&",
+    [TK_CARET] = "^",
+    [TK_PIPE] = "|",
+    [TK_COMMA] = ",",
+    [TK_LBRACK] = "(",
+    [TK_RBRACK] = ")",
+    [TK_LSQ_BRACK] = "[",
+    [TK_RSQ_BRACK] = "]",
+    [TK_LCURLY] = "{",
+    [TK_RCURLY] = "}",
+    [TK_HASH] = "#",
+    [TK_COLON] = ":",
+    [TK_SEMI_COLON] = ";",
+    [TK_PIPE_PIPE] = "||",
+    [TK_AMP_AMP] = "&&",
+    [TK_GRT_EQ] = ">=",
+    [TK_LESS_EQ] = "<=",
+    [TK_NOT_EQ] = "!=",
+    [TK_EQ_EQ] = "==",
+    [TK_LSHIFT] = ">>",
+    [TK_RSHIFT] = "<<",
+    [TK_ARROW] = "=>",
+    [TK_FALSE] = "false",
+    [TK_TRUE] = "true",
+    [TK_NONE] = "None",
+    [TK_SHOW] = "show",
+    [TK_IDENT] = "<identifier>",
+    [TK_STRING] = "<string>",
+    [TK_EOF] = "<eof>",
+    [TK_ERROR] = "<error>",
+    [TK_LET] = "let",
+    [TK_ASSERT] = "assert",
+    [TK_IF] = "if",
+    [TK_ELSE] = "else",
+    [TK_WHILE] = "while",
+    [TK_BREAK] = "break",
+    [TK_CONTINUE] = "continue",
+    [TK_FN] = "fn",
+    [TK_RETURN] = "return",
+    [TK_AT] = "@",
+    [TK_STRUCT] = "struct",
 };
 
 void init_lexer(Lexer* lexer, char* src) {
@@ -235,6 +263,8 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
       switch (*(lexer->start + 1)) {
         case 'h':
           return expect(lexer, "ow", 2, 2, TK_SHOW);
+        case 't':
+          return expect(lexer, "ruct", 2, 4, TK_STRUCT);
       }
       break;
     case 'w':
@@ -312,6 +342,8 @@ Token get_token(Lexer* lexer) {
   switch (ch) {
     case '"':
       return lex_string(lexer, ch);
+    case '@':
+      return new_token(lexer, TK_AT);
     case ',':
       return new_token(lexer, TK_COMMA);
     case ';':
@@ -346,14 +378,17 @@ Token get_token(Lexer* lexer) {
       return new_token(lexer, TK_CARET);
     case '*':
       return new_token(lexer, check(lexer, '*') ? TK_STAR_STAR : TK_STAR);
-    case '=':
-      return new_token(lexer, check(lexer, '=') ? TK_EQ_EQ : TK_EQ);
     case '&':
       return new_token(lexer, check(lexer, '&') ? TK_AMP_AMP : TK_AMP);
     case '|':
       return new_token(lexer, check(lexer, '|') ? TK_PIPE_PIPE : TK_PIPE);
     case '!':
       return new_token(lexer, check(lexer, '=') ? TK_NOT_EQ : TK_EXC_MARK);
+    case '=':
+      return new_token(
+          lexer,
+          check(lexer, '=') ? TK_EQ_EQ
+                            : (check(lexer, '>') ? TK_ARROW : TK_EQ));
     case '>':
       return new_token(
           lexer,

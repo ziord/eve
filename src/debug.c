@@ -51,6 +51,17 @@ int closure_instruction(char* inst, Code* code, int offset) {
   return offset;
 }
 
+int struct_instruction(char* inst, Code* code, int offset) {
+  // inst name-slot-index field-count
+  int operand = code->bytes[++offset];
+  printf("%-16s\t%3d    ", inst, operand);
+  printf("(");
+  Value val = code->vpool.values[operand];
+  print_value(val);
+  printf(")\t %d\n", code->bytes[++offset]);
+  return ++offset;
+}
+
 int dis_instruction(Code* code, int index) {
   if (index > 0 && code->lines[index] == code->lines[index - 1]) {
     printf("   |\t%04d\t", index);
@@ -147,6 +158,8 @@ int dis_instruction(Code* code, int index) {
       return constant_instruction("$GET_GLOBAL", code, index);
     case $SET_GLOBAL:
       return constant_instruction("$SET_GLOBAL", code, index);
+    case $BUILD_STRUCT:
+      return struct_instruction("$BUILD_STRUCT", code, index);
     case $BUILD_CLOSURE:
       return closure_instruction("$BUILD_CLOSURE", code, index);
     default:

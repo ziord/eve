@@ -73,7 +73,7 @@ OpTy get_op(TokenTy ty) {
     case TK_AMP_AMP:
       return OP_AND;
     case TK_DCOLON:
-      return OP_COL;
+      return OP_DCOL;
     case TK_DOT:
       return OP_DOT;
     default:

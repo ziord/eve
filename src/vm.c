@@ -208,44 +208,46 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
 }
 
 static bool perform_prop_access(VM* vm, Value value, Value property) {
-  if (IS_STRING(property)) {
-    ObjString* prop = AS_STRING(property);
-    if (IS_STRUCT(value)) {
-      ObjStruct* strukt = AS_STRUCT(value);
-      Value res;
-      if ((res = hashmap_get(&strukt->fields, property)) != NOTHING_VAL) {
-        push_stack(vm, res);
-        return true;
-      } else {
-        runtime_error(
-            vm,
-            "Illegal/unknown property access '%s'",
-            prop->str);
-      }
-    } else if (IS_INSTANCE(value)) {
-      ObjInstance* instance = AS_INSTANCE(value);
-      Value res;
-      if ((res = hashmap_get(&instance->fields, property)) != NOTHING_VAL) {
-        push_stack(vm, res);
-        return true;
-      } else {
-        runtime_error(
-            vm,
-            "Illegal/unknown property access '%s'",
-            prop->str);
-      }
+  ObjString* prop = AS_STRING(property);
+  if (IS_STRUCT(value)) {
+    ObjStruct* strukt = AS_STRUCT(value);
+    Value res;
+    if ((res = hashmap_get(&strukt->fields, property)) != NOTHING_VAL) {
+      push_stack(vm, res);
+      return true;
     } else {
-      runtime_error(
-          vm,
-          "'%s' type has no property '%s'",
-          get_value_type(value),
-          prop->str);
+      runtime_error(vm, "Illegal/unknown property access '%s'", prop->str);
     }
+  } else if (IS_INSTANCE(value)) {
+    ObjInstance* instance = AS_INSTANCE(value);
+    Value res;
+    if ((res = hashmap_get(&instance->fields, property)) != NOTHING_VAL) {
+      push_stack(vm, res);
+      return true;
+    } else if ((hashmap_has_key(
+                   &instance->strukt->fields,
+                   property,
+                   &res))) {
+      /*
+       * here, the property doesn't exist as a key in the instance's `fields` which could mean two things:
+       * 1. the key wasn't assigned when creating the instance e.g. Bar {}; instead of Bar { a = something };
+       * 2. the key is invalid. e.g. belongs to the struct, or isn't a field.
+       * For (1.) we look up the key in the instance's struct, if the struct has such a key, and the key doesn't
+       * belong to the struct (i.e. key is NOTHING_VAL), we can safely set it as `None` on the instance
+       */
+      if (res == NOTHING_VAL) {
+        hashmap_put(&instance->fields, vm, property, NONE_VAL);
+        push_stack(vm, NONE_VAL);
+        return true;
+      }
+    }
+    runtime_error(vm, "Illegal/unknown property access '%s'", prop->str);
   } else {
     runtime_error(
         vm,
-        "Invalid property access. Got type '%s'",
-        get_value_type(property));
+        "'%s' type has no property '%s'",
+        get_value_type(value),
+        prop->str);
   }
   return false;
 }
@@ -284,7 +286,7 @@ inline static bool call_value(VM* vm, Value val, int argc, bool is_tco) {
             .closure = AS_CLOSURE(val),
             .stack = vm->sp - 1 - argc,
             .ip = fn->code.bytes};
-        push_frame(vm, frame);
+        return push_frame(vm, frame);
       } else {
         // close all upvalues currently still unclosed
         close_upvalues(vm, vm->fp->stack);
@@ -294,8 +296,8 @@ inline static bool call_value(VM* vm, Value val, int argc, bool is_tco) {
         }
         vm->sp = vm->fp->stack + j;
         vm->fp->ip = fn->code.bytes;
+        return true;
       }
-      return true;
     }
     runtime_error(
         vm,
@@ -539,6 +541,32 @@ IResult run(VM* vm) {
         Value value = pop_stack(vm);
         if (!perform_prop_access(vm, value, property)) {
           return RESULT_RUNTIME_ERROR;
+        }
+        break;
+      }
+      case $SET_PROPERTY: {
+        Value property = READ_CONST(vm);
+        Value var = pop_stack(vm);
+        if (IS_INSTANCE(var)) {
+          ObjInstance* instance = AS_INSTANCE(var);
+          // true if 'property' is a new key
+          if (hashmap_put(
+                  &instance->fields,
+                  vm,
+                  property,
+                  PEEK_STACK(vm))) {
+            hashmap_remove(&instance->fields, property);
+            return runtime_error(
+                vm,
+                "Instance of %s has no property '%s'",
+                instance->strukt->name->str,
+                AS_STRING(property)->str);
+          }
+        } else {
+          return runtime_error(
+              vm,
+              "Cannot set property on type '%s'",
+              get_value_type(var));
         }
         break;
       }

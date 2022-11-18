@@ -58,7 +58,9 @@ static AstNode* parse_stmt(Parser* parser);
 static AstNode* parse_func_expr(Parser* parser, bool assignable);
 static AstNode* parse_call(Parser* parser, AstNode* left, bool assignable);
 static AstNode*
-parse_access_expr(Parser* parser, AstNode* left, bool assignable);
+parse_dcol_expr(Parser* parser, AstNode* left, bool assignable);
+static AstNode*
+parse_dot_expr(Parser* parser, AstNode* left, bool assignable);
 
 // clang-format off
 ExprParseTable p_table[] = {
@@ -88,7 +90,7 @@ ExprParseTable p_table[] = {
   [TK_RSQ_BRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_HASH] = {.bp = BP_NONE, .prefix = parse_map, .infix = NULL},
   [TK_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
-  [TK_DCOLON] = {.bp = BP_ACCESS, .prefix = NULL, .infix = parse_access_expr},
+  [TK_DCOLON] = {.bp = BP_ACCESS, .prefix = NULL, .infix = parse_dcol_expr},
   [TK_SEMI_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_RCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -98,7 +100,7 @@ ExprParseTable p_table[] = {
   [TK_RSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
   [TK_ARROW] = {.bp = BP_SHIFT, .prefix = NULL, .infix = NULL},
   [TK_AT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
-  [TK_DOT] = {.bp = BP_ACCESS, .prefix = NULL, .infix = parse_access_expr},
+  [TK_DOT] = {.bp = BP_ACCESS, .prefix = NULL, .infix = parse_dot_expr},
   [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
@@ -277,7 +279,6 @@ inline static bool is_assignable_op(TokenTy ty) {
     case TK_AMP:
     case TK_CARET:
     case TK_PIPE:
-    case TK_LBRACK:
     case TK_LSHIFT:
     case TK_RSHIFT:
       return true;
@@ -631,7 +632,7 @@ parse_binary(Parser* parser, AstNode* left, bool assignable) {
 }
 
 static AstNode*
-parse_access_expr(Parser* parser, AstNode* left, bool assignable) {
+parse_dcol_expr(Parser* parser, AstNode* left, bool assignable) {
   int line = parser->current_tk.line;
   BindingPower bp = p_table[parser->current_tk.ty].bp;
   // this is guaranteed to be valid by the ExprParseTable
@@ -648,6 +649,14 @@ parse_access_expr(Parser* parser, AstNode* left, bool assignable) {
   }
   AstNode* right = _parse(parser, bp);
   return new_binary(&parser->store, left, right, line, op);
+}
+
+static AstNode*
+parse_dot_expr(Parser* parser, AstNode* left, bool assignable) {
+  Token tok = parser->current_tk;
+  AstNode* dot_expr = parse_dcol_expr(parser, left, assignable);
+  dot_expr->num.type = AST_DOT_EXPR;
+  return handle_aug_assign(parser, dot_expr, assignable, tok);
 }
 
 static AstNode*

@@ -1,0 +1,62 @@
+struct Data {
+    @compose clear, add, length, print, get;
+    @declare new => fn () {
+        let list = [None, None, None, None, None, None];
+        let len = 0;
+        let cap = 6;
+        fn _clear() {
+            let i = 0;
+            while i < len {
+                list[i] = None;
+                i += 1;
+            }
+            len -= i;
+        }
+        fn add(val) {
+            list[len] = val;
+            len += 1;
+        }
+        fn _len() {
+            return len;
+        }
+        fn get(index) {
+            if index < len {
+                return list[index];
+            }
+            return None;
+        }
+        fn _print() {
+            let i = 0;
+            while i < len {
+               show list[i];
+               i += 1;
+            }
+        }
+        fn setup() {
+            let d = Data { clear = _clear, add = add, length = _len, print = _print, get = get };
+            return d;
+        }
+        return setup();
+    };
+}
+
+let d = Data::new();
+assert d.clear != None;
+assert d.add != None;
+assert d.length != None;
+assert d.print != None;
+assert d.get != None;
+d.add(5);
+d.add("foxes");
+d.add("cats");
+d.print();
+assert d.get(0) == 5;
+assert d.get(1) == "foxes";
+assert d.get(2) == "cats";
+assert d.get(3) == None;
+assert d.get(30) == None;
+assert d.length() == 3;
+d.clear();
+assert d.length() == 0;
+assert d.get(0) == None;
+assert d.get(10) == None;

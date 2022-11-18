@@ -26,7 +26,11 @@ OpCode op_table[][2] = {
     [OP_BW_OR] = {0xff, $BW_OR},
     [OP_BW_XOR] = {0xff, $BW_XOR},
     [OP_BW_COMPL] = {$BW_INVERT, 0xff},
-    [OP_COL] = {0xff, 0xff},
+    [OP_DCOL] = {0xff, 0xff},
+    [OP_DOT] = {0xff, 0xff},
+    [OP_EQ] = {0xff, 0xff},
+    [OP_OR] = {0xff, 0xff},
+    [OP_AND] = {0xff, 0xff},
 };
 
 void c_(Compiler* compiler, AstNode* node);
@@ -289,8 +293,9 @@ void c_or(Compiler* compiler, BinaryNode* node) {
   patch_jump(compiler, end_jmp_idx);
 }
 
-void c_col(Compiler* compiler, BinaryNode* node) {
-  // compiles expr::var (struct property access)
+void c_dcol_dot(Compiler* compiler, BinaryNode* node) {
+  // compiles expr::var (struct property access) or
+  // expr.var (instance property access) i.e. OP_DCOL | OP_DOT
   c_(compiler, node->l_node);
   load_variable(compiler, &node->r_node->var, $GET_PROPERTY);
 }
@@ -301,8 +306,8 @@ void c_binary(Compiler* compiler, AstNode* node) {
     c_or(compiler, bin);
   } else if (bin->op == OP_AND) {
     c_and(compiler, bin);
-  } else if (bin->op == OP_COL || bin->op == OP_DOT) {
-    c_col(compiler, bin);
+  } else if (bin->op == OP_DCOL || bin->op == OP_DOT) {
+    c_dcol_dot(compiler, bin);
   } else {
     c_(compiler, bin->l_node);
     c_(compiler, bin->r_node);
@@ -382,12 +387,25 @@ void c_subscript_assign(Compiler* compiler, BinaryNode* assign) {
       $SET_SUBSCRIPT;
 }
 
+void c_dot_assign(Compiler* compiler, BinaryNode* assign) {
+  c_(compiler, assign->r_node);
+  // change the ast node type from DOT_EXPR to BINARY, so that it invokes
+  // c_binary() and in turn invokes c_dcol_dot()
+  assign->l_node->num.type = AST_BINARY;
+  c_(compiler, assign->l_node);
+  // now rewrite $GET_PROPERTY emitted by c_dcol_dot() to $SET_PROPERTY
+  compiler->func->code.bytes[compiler->func->code.length - 2] =
+      $SET_PROPERTY;
+}
+
 void c_assign(Compiler* compiler, AstNode* node) {
   BinaryNode* assign = CAST(BinaryNode*, node);
   if (assign->l_node->num.type == AST_VAR) {
     c_var_assign(compiler, assign);
   } else if (assign->l_node->num.type == AST_SUBSCRIPT) {
     c_subscript_assign(compiler, assign);
+  } else if (assign->l_node->num.type == AST_DOT_EXPR) {
+    c_dot_assign(compiler, assign);
   } else {
     return compile_error(compiler, "Invalid assignment target");
   }
@@ -545,11 +563,11 @@ void c_struct(Compiler* compiler, AstNode* node) {
       c_(compiler, meta->expr);
     } else {
       // use NOTHING as placeholder value
-      emit_value(compiler, $LOAD_CONST, NOTHING_VAL, struct_n->line);
+      emit_value(compiler, $LOAD_CONST, NOTHING_VAL, last_line(compiler));
     }
   }
   load_variable(compiler, &struct_n->name->var, $BUILD_STRUCT);
-  emit_byte(compiler, (byte_t)struct_n->field_count, struct_n->line);
+  emit_byte(compiler, (byte_t)struct_n->field_count, last_line(compiler));
 }
 
 void c_struct_call(Compiler* compiler, AstNode* node) {
@@ -703,6 +721,9 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_STRUCT_CALL:
       c_struct_call(compiler, node);
+      break;
+    case AST_DOT_EXPR:
+      c_binary(compiler, node);
       break;
     case AST_PROGRAM:
       c_program(compiler, node);

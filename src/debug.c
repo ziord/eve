@@ -152,6 +152,8 @@ int dis_instruction(Code* code, int index) {
       return byte_instruction("$GET_UPVALUE", code, index);
     case $BUILD_INSTANCE:
       return byte_instruction("$BUILD_INSTANCE", code, index);
+    case $SET_PROPERTY:
+      return byte_instruction("$SET_PROPERTY", code, index);
     case $LOAD_CONST:
       return constant_instruction("$LOAD_CONST", code, index);
     case $DEFINE_GLOBAL:

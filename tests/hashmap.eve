@@ -32,12 +32,17 @@ assert dict["Foo"] == 15;
 
 let dict = #{};
 struct Foo {@compose x; @declare y => "p";}
+let f = Foo {x = 5};
 dict[Foo] = 5;
+dict[f] = f;
 let a = Foo;
 fn Foo() {}
 let b = Foo;
 dict[Foo] = 10;
 dict["Foo"] = 15;
+assert dict[f].x == 5;
+f.x = fn () {return "true";};
+assert dict[f].x() == "true";
 
 assert dict[a] == 5;
 assert dict[b] == 10;

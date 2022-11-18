@@ -28,7 +28,7 @@ typedef enum {
   OP_BW_OR,
   OP_NOT,
   OP_BW_COMPL,
-  OP_COL,
+  OP_DCOL,
   OP_DOT,
 } OpTy;
 
@@ -57,6 +57,7 @@ typedef enum {
   AST_STRUCT,
   AST_STRUCT_CALL,
   AST_CALL,
+  AST_DOT_EXPR,
   AST_PROGRAM,
 } AstTy;
 

@@ -74,6 +74,8 @@ OpTy get_op(TokenTy ty) {
       return OP_AND;
     case TK_DCOLON:
       return OP_COL;
+    case TK_DOT:
+      return OP_DOT;
     default:
       return 0xff;
   }

@@ -28,6 +28,8 @@ char* token_types[] = {
     [TK_HASH] = "#",
     [TK_COLON] = ":",
     [TK_SEMI_COLON] = ";",
+    [TK_DOT] = ".",
+    [TK_AT] = "@",
     [TK_DCOLON] = "::",
     [TK_PIPE_PIPE] = "||",
     [TK_AMP_AMP] = "&&",
@@ -55,7 +57,6 @@ char* token_types[] = {
     [TK_CONTINUE] = "continue",
     [TK_FN] = "fn",
     [TK_RETURN] = "return",
-    [TK_AT] = "@",
     [TK_STRUCT] = "struct",
 };
 
@@ -345,6 +346,8 @@ Token get_token(Lexer* lexer) {
       return lex_string(lexer, ch);
     case '@':
       return new_token(lexer, TK_AT);
+    case '.':
+      return new_token(lexer, TK_DOT);
     case ',':
       return new_token(lexer, TK_COMMA);
     case ';':

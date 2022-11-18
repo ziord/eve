@@ -208,9 +208,9 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
 }
 
 static bool perform_prop_access(VM* vm, Value value, Value property) {
-  if (IS_STRUCT(value)) {
-    if (IS_STRING(property)) {
-      ObjString* prop = AS_STRING(property);
+  if (IS_STRING(property)) {
+    ObjString* prop = AS_STRING(property);
+    if (IS_STRUCT(value)) {
       ObjStruct* strukt = AS_STRUCT(value);
       Value res;
       if ((res = hashmap_get(&strukt->fields, property)) != NOTHING_VAL) {
@@ -222,12 +222,30 @@ static bool perform_prop_access(VM* vm, Value value, Value property) {
             "Illegal/unknown property access '%s'",
             prop->str);
       }
+    } else if (IS_INSTANCE(value)) {
+      ObjInstance* instance = AS_INSTANCE(value);
+      Value res;
+      if ((res = hashmap_get(&instance->fields, property)) != NOTHING_VAL) {
+        push_stack(vm, res);
+        return true;
+      } else {
+        runtime_error(
+            vm,
+            "Illegal/unknown property access '%s'",
+            prop->str);
+      }
     } else {
       runtime_error(
           vm,
-          "Invalid property access. Got type '%s'",
-          get_value_type(property));
+          "'%s' type has no property '%s'",
+          get_value_type(value),
+          prop->str);
     }
+  } else {
+    runtime_error(
+        vm,
+        "Invalid property access. Got type '%s'",
+        get_value_type(property));
   }
   return false;
 }

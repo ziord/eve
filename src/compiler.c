@@ -301,7 +301,7 @@ void c_binary(Compiler* compiler, AstNode* node) {
     c_or(compiler, bin);
   } else if (bin->op == OP_AND) {
     c_and(compiler, bin);
-  } else if (bin->op == OP_COL) {
+  } else if (bin->op == OP_COL || bin->op == OP_DOT) {
     c_col(compiler, bin);
   } else {
     c_(compiler, bin->l_node);

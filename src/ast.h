@@ -29,6 +29,7 @@ typedef enum {
   OP_NOT,
   OP_BW_COMPL,
   OP_COL,
+  OP_DOT,
 } OpTy;
 
 typedef enum {

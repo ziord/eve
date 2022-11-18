@@ -28,7 +28,7 @@ typedef enum BindingPower {
   BP_POWER,       // **
   BP_UNARY,       // !, -, +, ~
   BP_CALL,        // ()
-  BP_ACCESS,      // [], .
+  BP_ACCESS,      // [], ., ::
 } BindingPower;
 // clang-format on
 
@@ -57,6 +57,8 @@ static AstNode* parse_decls(Parser* parser);
 static AstNode* parse_stmt(Parser* parser);
 static AstNode* parse_func_expr(Parser* parser, bool assignable);
 static AstNode* parse_call(Parser* parser, AstNode* left, bool assignable);
+static AstNode*
+parse_struct_access(Parser* parser, AstNode* left, bool assignable);
 
 // clang-format off
 ExprParseTable p_table[] = {
@@ -86,6 +88,7 @@ ExprParseTable p_table[] = {
   [TK_RSQ_BRACK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_HASH] = {.bp = BP_NONE, .prefix = parse_map, .infix = NULL},
   [TK_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_DCOLON] = {.bp = BP_ACCESS, .prefix = NULL, .infix = parse_struct_access},
   [TK_SEMI_COLON] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_RCURLY] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -410,6 +413,9 @@ static AstNode* parse_num(Parser* parser, bool assignable) {
 }
 
 static AstNode* parse_var(Parser* parser, bool assignable) {
+  /*
+   * ID ("::" expr)? | ID { (ID = expr ("," ID = expr)*)? }
+   */
   consume(parser, TK_IDENT);
   Token tok = parser->previous_tk;
   AstNode* node = new_node(parser);
@@ -589,6 +595,26 @@ parse_binary(Parser* parser, AstNode* left, bool assignable) {
   // this is guaranteed to be valid by the ExprParseTable
   OpTy op = get_op(parser->current_tk.ty);
   advance(parser);
+  AstNode* right = _parse(parser, bp);
+  return new_binary(&parser->store, left, right, line, op);
+}
+
+static AstNode*
+parse_struct_access(Parser* parser, AstNode* left, bool assignable) {
+  int line = parser->current_tk.line;
+  BindingPower bp = p_table[parser->current_tk.ty].bp;
+  // this is guaranteed to be valid by the ExprParseTable
+  OpTy op = get_op(parser->current_tk.ty);
+  advance(parser);
+  if (!is_tty(parser, TK_IDENT)) {
+    CREATE_BUFFER(
+        buff,
+        error_types[E0004].hlp_msg,
+        token_types[TK_IDENT],
+        token_types[parser->current_tk.ty])
+    ErrorArgs args = new_error_arg(NULL, NULL, buff);
+    return parse_error(parser, E0004, &args);
+  }
   AstNode* right = _parse(parser, bp);
   return new_binary(&parser->store, left, right, line, op);
 }

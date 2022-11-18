@@ -41,6 +41,7 @@ typedef enum {
   $POP_N,
   $DISPLAY,
   $SUBSCRIPT,
+  $GET_PROPERTY,
   $SET_SUBSCRIPT,
   $DEFINE_GLOBAL,
   $GET_GLOBAL,

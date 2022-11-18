@@ -1,8 +1,18 @@
+struct Empty{}
+assert Empty;
+
+struct Bar {
+    @declare pi => 22/7;
+    @declare print => fn (arg) { show arg; return Bar::pi; };
+}
+
 struct Foo {
   @compose: x;
   @compose y, z;
   @declare p => 500;
+  @declare bar => Bar;
   @declare q => 60, v => "foxy";
+  @declare bax => fn () { return 0xff; }, none => None;
 }
 
 {
@@ -19,3 +29,19 @@ struct Foo {
 
 show Foo;
 assert Foo && Foo == Foo;
+
+show Foo::p, Foo::q;
+assert Foo::q == 60;
+assert Foo::v == "foxy";
+assert Foo::none == None;
+assert Foo::bax() == 255;
+assert Foo::bar::pi == 22/7;
+assert Foo::bar::print("0xdeadbeef") == 22/7;
+
+let ret_struct = fn () {
+    return Bar;
+};
+
+assert ret_struct()::print("ox") == Bar::pi;
+assert (ret_struct()::print)("ox") == Bar::pi;
+assert (ret_struct()::print)("ox") == ret_struct()::print("ba");

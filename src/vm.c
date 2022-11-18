@@ -207,6 +207,31 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
   return false;
 }
 
+static bool perform_prop_access(VM* vm, Value value, Value property) {
+  if (IS_STRUCT(value)) {
+    if (IS_STRING(property)) {
+      ObjString* prop = AS_STRING(property);
+      ObjStruct* strukt = AS_STRUCT(value);
+      Value res;
+      if ((res = hashmap_get(&strukt->fields, property)) != NOTHING_VAL) {
+        push_stack(vm, res);
+        return true;
+      } else {
+        runtime_error(
+            vm,
+            "Illegal/unknown property access '%s'",
+            prop->str);
+      }
+    } else {
+      runtime_error(
+          vm,
+          "Invalid property access. Got type '%s'",
+          get_value_type(property));
+    }
+  }
+  return false;
+}
+
 static bool
 perform_subscript_assign(VM* vm, Value var, Value subscript, Value value) {
   if (IS_LIST(var)) {
@@ -487,6 +512,14 @@ IResult run(VM* vm) {
         Value subscript = pop_stack(vm);
         Value val = pop_stack(vm);
         if (!perform_subscript(vm, val, subscript)) {
+          return RESULT_RUNTIME_ERROR;
+        }
+        break;
+      }
+      case $GET_PROPERTY: {
+        Value property = READ_CONST(vm);
+        Value value = pop_stack(vm);
+        if (!perform_prop_access(vm, value, property)) {
           return RESULT_RUNTIME_ERROR;
         }
         break;

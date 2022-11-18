@@ -34,6 +34,7 @@ typedef enum {
   TK_AT,            // @
   TK_COLON,         // :
   TK_SEMI_COLON,    // ;
+  TK_DCOLON,        // ::
   TK_PIPE_PIPE,     // ||
   TK_AMP_AMP,       // &&
   TK_GRT_EQ,        // >=

@@ -26,6 +26,7 @@ OpCode op_table[][2] = {
     [OP_BW_OR] = {0xff, $BW_OR},
     [OP_BW_XOR] = {0xff, $BW_XOR},
     [OP_BW_COMPL] = {$BW_INVERT, 0xff},
+    [OP_COL] = {0xff, 0xff},
 };
 
 void c_(Compiler* compiler, AstNode* node);
@@ -72,7 +73,16 @@ static int store_variable(Compiler* compiler, VarNode* var) {
       var->len,
       false);
   int slot = write_value(&compiler->func->code.vpool, val, compiler->vm);
+  if (slot >= CONST_MAX) {
+    compile_error(compiler, "Too many constants");
+  }
   return slot;
+}
+
+static void load_variable(Compiler* compiler, VarNode* var, byte_t op) {
+  byte_t slot = store_variable(compiler, var);
+  emit_byte(compiler, op, var->line);
+  emit_byte(compiler, slot, var->line);
 }
 
 inline static void reserve_local(Compiler* compiler) {
@@ -279,12 +289,20 @@ void c_or(Compiler* compiler, BinaryNode* node) {
   patch_jump(compiler, end_jmp_idx);
 }
 
+void c_col(Compiler* compiler, BinaryNode* node) {
+  // compiles expr::var (struct property access)
+  c_(compiler, node->l_node);
+  load_variable(compiler, &node->r_node->var, $GET_PROPERTY);
+}
+
 void c_binary(Compiler* compiler, AstNode* node) {
   BinaryNode* bin = CAST(BinaryNode*, node);
   if (bin->op == OP_OR) {
     c_or(compiler, bin);
   } else if (bin->op == OP_AND) {
     c_and(compiler, bin);
+  } else if (bin->op == OP_COL) {
+    c_col(compiler, bin);
   } else {
     c_(compiler, bin->l_node);
     c_(compiler, bin->r_node);
@@ -338,9 +356,7 @@ void c_var(Compiler* compiler, AstNode* node) {
     emit_byte(compiler, $GET_UPVALUE, var->line);
     emit_byte(compiler, (byte_t)index, var->line);
   } else {
-    byte_t slot = store_variable(compiler, var);
-    emit_byte(compiler, $GET_GLOBAL, var->line);
-    emit_byte(compiler, slot, var->line);
+    load_variable(compiler, var, $GET_GLOBAL);
   }
 }
 
@@ -355,9 +371,7 @@ void c_var_assign(Compiler* compiler, BinaryNode* assign) {
     emit_byte(compiler, (byte_t)slot, assign->line);
   } else {
     // globals
-    slot = store_variable(compiler, &assign->l_node->var);
-    emit_byte(compiler, $SET_GLOBAL, assign->line);
-    emit_byte(compiler, (byte_t)slot, assign->line);
+    load_variable(compiler, &assign->l_node->var, $SET_GLOBAL);
   }
 }
 
@@ -386,10 +400,8 @@ void c_var_decl(Compiler* compiler, AstNode* node) {
     c_(compiler, decl->r_node);
     compiler->locals[index].initialized = true;
   } else {
-    byte_t slot = store_variable(compiler, &decl->l_node->var);
     c_(compiler, decl->r_node);
-    emit_byte(compiler, $DEFINE_GLOBAL, decl->line);
-    emit_byte(compiler, slot, decl->line);
+    load_variable(compiler, &decl->l_node->var, $DEFINE_GLOBAL);
   }
 }
 
@@ -528,9 +540,7 @@ void c_struct(Compiler* compiler, AstNode* node) {
         .name = meta->var.value,
         .len = meta->var.length,
         .line = meta->var.line};
-    slot = store_variable(compiler, &var);
-    emit_byte(compiler, $LOAD_CONST, var.line);
-    emit_byte(compiler, slot, var.line);
+    load_variable(compiler, &var, $LOAD_CONST);
     if (meta->expr) {
       c_(compiler, meta->expr);
     } else {
@@ -538,9 +548,7 @@ void c_struct(Compiler* compiler, AstNode* node) {
       emit_value(compiler, $LOAD_CONST, NOTHING_VAL, struct_n->line);
     }
   }
-  slot = store_variable(compiler, &struct_n->name->var);
-  emit_byte(compiler, $BUILD_STRUCT, struct_n->line);
-  emit_byte(compiler, slot, struct_n->line);
+  load_variable(compiler, &struct_n->name->var, $BUILD_STRUCT);
   emit_byte(compiler, (byte_t)struct_n->field_count, struct_n->line);
 }
 

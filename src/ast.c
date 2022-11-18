@@ -72,6 +72,8 @@ OpTy get_op(TokenTy ty) {
       return OP_BW_AND;
     case TK_AMP_AMP:
       return OP_AND;
+    case TK_DCOLON:
+      return OP_COL;
     default:
       return 0xff;
   }

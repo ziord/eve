@@ -532,7 +532,7 @@ static void rehash(ObjHashMap* table, VM* vm) {
         new_entries,
         table->entries[i].key,
         table->entries[i].value,
-        table->capacity);
+        capacity);
   }
   FREE(vm, table->entries, HashEntry);
   table->entries = new_entries;
@@ -556,6 +556,11 @@ Value hashmap_get(ObjHashMap* table, Value key) {
     return entry->value;
   }
   return NOTHING_VAL;
+}
+
+bool hashmap_has_key(ObjHashMap* table, Value key) {
+  HashEntry* entry;
+  return find_entry(table->entries, table->capacity, &entry, key);
 }
 
 bool hashmap_remove(ObjHashMap* table, Value key) {

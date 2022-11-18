@@ -196,6 +196,7 @@ char* get_func_name(ObjFn* fn);
 void hashmap_init(ObjHashMap* table);
 bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);
 Value hashmap_get(ObjHashMap* table, Value key);
+bool hashmap_has_key(ObjHashMap* table, Value key);
 bool hashmap_remove(ObjHashMap* table, Value key);
 ObjString*
 hashmap_find_interned(ObjHashMap* table, char* str, int len, uint32_t hash);

@@ -630,6 +630,36 @@ IResult run(VM* vm) {
         push_stack(vm, OBJ_VAL(strukt));
         break;
       }
+      case $BUILD_INSTANCE: {
+        Value var = pop_stack(vm);
+        byte_t field_count = READ_BYTE(vm) * 2;  // k-v pairs
+        if (!IS_STRUCT(var)) {
+          return runtime_error(
+              vm,
+              "Cannot instantiate '%s' type",
+              get_value_type(var));
+        }
+        Value key, val, check;
+        ObjStruct* strukt = AS_STRUCT(var);
+        ObjInstance* instance = create_instance(vm, strukt);
+        for (int i = 0; i < field_count; i += 2) {
+          val = PEEK_STACK_AT(vm, i);
+          key = PEEK_STACK_AT(vm, i + 1);
+          if (hashmap_has_key(&strukt->fields, key, &check)
+              && check == NOTHING_VAL) {
+            // only store fields with NOTHING_VAL value flag in the instance's field
+            hashmap_put(&instance->fields, vm, key, val);
+          } else {
+            return runtime_error(
+                vm,
+                "Illegal/unknown instance property access '%s'",
+                AS_STRING(key)->str);
+          }
+        }
+        vm->sp -= field_count;
+        push_stack(vm, OBJ_VAL(instance));
+        break;
+      }
       case $CLOSE_UPVALUE: {
         close_upvalues(vm, vm->sp - 1);
         pop_stack(vm);

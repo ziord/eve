@@ -1,0 +1,13 @@
+struct Bar {
+    @declare pi => 22/7;
+    @declare print => fn (arg) { show arg; return Bar::pi; };
+    @compose push, pop;
+}
+
+let x = Bar { push = None, pop = None };
+show x;
+assert x;
+
+let y = Bar {};
+assert y;
+assert x != y;

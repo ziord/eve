@@ -16,3 +16,29 @@ assert x["a"]["test"] == "passing";
 x["a"]["fan"] = [1, 2, 3];
 assert x["a"]["fan"][-2] == 2;
 assert x;
+
+let dict = #{};
+struct Foo {}
+dict[Foo] = 5;
+let a = Foo;
+fn Foo() {}
+let b = Foo;
+dict[Foo] = 10;
+dict["Foo"] = 15;
+
+assert dict[a] == 5;
+assert dict[b] == 10;
+assert dict["Foo"] == 15;
+
+let dict = #{};
+struct Foo {@compose x; @declare y => "p";}
+dict[Foo] = 5;
+let a = Foo;
+fn Foo() {}
+let b = Foo;
+dict[Foo] = 10;
+dict["Foo"] = 15;
+
+assert dict[a] == 5;
+assert dict[b] == 10;
+assert dict["Foo"] == 15;

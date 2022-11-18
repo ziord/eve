@@ -552,6 +552,18 @@ void c_struct(Compiler* compiler, AstNode* node) {
   emit_byte(compiler, (byte_t)struct_n->field_count, struct_n->line);
 }
 
+void c_struct_call(Compiler* compiler, AstNode* node) {
+  StructCallNode* struct_c = &node->struct_call;
+  MapNode* map = &struct_c->fields;
+  for (int i = map->length - 1; i >= 0; i--) {
+    load_variable(compiler, &map->items[i][0]->var, $LOAD_CONST);  // key
+    c_(compiler, map->items[i][1]);  // value
+  }
+  c_(compiler, struct_c->name);
+  emit_byte(compiler, $BUILD_INSTANCE, last_line(compiler));
+  emit_byte(compiler, (byte_t)map->length, last_line(compiler));
+}
+
 void c_function(Compiler* compiler, AstNode* node) {
   // let func = fn () {..} | fn func() {...}
   FuncNode* func = &node->func;
@@ -688,6 +700,9 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_STRUCT:
       c_struct(compiler, node);
+      break;
+    case AST_STRUCT_CALL:
+      c_struct_call(compiler, node);
       break;
     case AST_PROGRAM:
       c_program(compiler, node);

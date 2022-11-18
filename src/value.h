@@ -47,6 +47,7 @@ typedef uint64_t Value;
 #define IS_FUNC(val) (is_object_type(val, OBJ_FN))
 #define IS_CLOSURE(val) (is_object_type(val, OBJ_CLOSURE))
 #define IS_STRUCT(val) (is_object_type(val, OBJ_STRUCT))
+#define IS_INSTANCE(val) (is_object_type(val, OBJ_INSTANCE))
 
 #define AS_STRING(val) ((ObjString*)(AS_OBJ(val)))
 #define AS_LIST(val) ((ObjList*)(AS_OBJ(val)))
@@ -54,6 +55,7 @@ typedef uint64_t Value;
 #define AS_FUNC(val) ((ObjFn*)(AS_OBJ(val)))
 #define AS_CLOSURE(val) ((ObjClosure*)(AS_OBJ(val)))
 #define AS_STRUCT(val) ((ObjStruct*)(AS_OBJ(val)))
+#define AS_INSTANCE(val) ((ObjInstance*)(AS_OBJ(val)))
 
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
@@ -88,6 +90,7 @@ typedef enum {
   OBJ_CLOSURE,
   OBJ_UPVALUE,
   OBJ_STRUCT,
+  OBJ_INSTANCE,
 } ObjTy;
 
 typedef struct Obj {
@@ -192,11 +195,12 @@ ObjFn* create_function(VM* vm);
 ObjClosure* create_closure(VM* vm, ObjFn* func);
 ObjUpvalue* create_upvalue(VM* vm, Value*);
 ObjStruct* create_struct(VM* vm, ObjString* name);
+ObjInstance* create_instance(VM* vm, ObjStruct* strukt);
 char* get_func_name(ObjFn* fn);
 void hashmap_init(ObjHashMap* table);
 bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);
 Value hashmap_get(ObjHashMap* table, Value key);
-bool hashmap_has_key(ObjHashMap* table, Value key);
+bool hashmap_has_key(ObjHashMap* table, Value key, Value* value);
 bool hashmap_remove(ObjHashMap* table, Value key);
 ObjString*
 hashmap_find_interned(ObjHashMap* table, char* str, int len, uint32_t hash);

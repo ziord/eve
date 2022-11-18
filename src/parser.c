@@ -424,6 +424,36 @@ static AstNode* parse_var(Parser* parser, bool assignable) {
       .len = tok.length,
       .name = tok.value,
       .type = AST_VAR};
+  // ID { (ID = expr ("," ID = expr)*)? }
+  if (is_tty(parser, TK_LCURLY) && assignable) {
+    // we'll represent struct instances as a StructCallNode ast node,
+    // with AST_STRUCT_CALL type, and its (key=value) fields stored in a map
+    advance(parser);
+    AstNode* st_call = new_node(parser);
+    st_call->struct_call = (StructCallNode) {
+        .type = AST_STRUCT_CALL,
+        .name = node,
+        .line = tok.line};
+    MapNode* map = &st_call->struct_call.fields;
+    *map = (MapNode) {.type = AST_MAP, .length = 0, .line = tok.line};
+    while (!is_tty(parser, TK_RCURLY) && !is_tty(parser, TK_EOF)) {
+      if (map->length > 0) {
+        consume(parser, TK_COMMA);
+      }
+      consume(parser, TK_IDENT);
+      AstNode* var = new_var(&parser->store, parser->previous_tk);
+      consume(parser, TK_EQ);
+      map->items[map->length][0] = var;
+      map->items[map->length++][1] = parse_expr(parser);
+      if (map->length > CONST_MAX) {
+        CREATE_BUFFER(buff, error_types[E0015].hlp_msg, CONST_MAX)
+        ErrorArgs args = new_error_arg(&parser->previous_tk, NULL, buff);
+        return parse_error(parser, E0015, &args);
+      }
+    }
+    consume(parser, TK_RCURLY);
+    return st_call;
+  }
   return handle_aug_assign(parser, node, assignable, tok);
 }
 

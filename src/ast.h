@@ -54,6 +54,7 @@ typedef enum {
   AST_VAR_DECL,
   AST_FUNC,
   AST_STRUCT,
+  AST_STRUCT_CALL,
   AST_CALL,
   AST_PROGRAM,
 } AstTy;
@@ -216,6 +217,13 @@ typedef struct {
 
 typedef struct {
   AstTy type;
+  int line;
+  AstNode* name;
+  MapNode fields;
+} StructCallNode;
+
+typedef struct {
+  AstTy type;
   Vec decls;
 } ProgramNode;
 
@@ -239,6 +247,7 @@ union AstNode {
   IfElseStmtNode ife_stmt;
   WhileStmtNode while_stmt;
   ControlStmtNode control_stmt;
+  StructCallNode struct_call;
   ProgramNode program;
 };
 
@@ -255,6 +264,7 @@ AstNode* new_ast_node(NodeStore* store);
 AstNode* new_num(NodeStore* store, double val, int line);
 AstNode* new_none(NodeStore* store, int line);
 AstNode* new_unary(NodeStore* store, AstNode* node, int line, OpTy op);
+AstNode* new_var(NodeStore* store, Token token);
 AstNode* new_binary(
     NodeStore* store,
     AstNode* left,

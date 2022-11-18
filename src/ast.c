@@ -128,3 +128,13 @@ AstNode* new_unary(NodeStore* store, AstNode* node, int line, OpTy op) {
   unary->op = op;
   return ast_node;
 }
+
+AstNode* new_var(NodeStore* store, Token token) {
+  AstNode* ast_node = new_ast_node(store);
+  ast_node->var = (VarNode) {
+      .type = AST_VAR,
+      .name = token.value,
+      .len = token.length,
+      .line = token.line};
+  return ast_node;
+}

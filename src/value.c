@@ -61,6 +61,10 @@ char* get_object_type(Obj* obj) {
     case OBJ_CLOSURE:
     case OBJ_FN:
       return "function";
+    case OBJ_STRUCT:
+      return "struct";
+    case OBJ_INSTANCE:
+      return "instance";
     default:
       UNREACHABLE("unknown object type");
   }
@@ -167,6 +171,10 @@ void print_object(Value val, Obj* obj) {
       printf("{struct %s}", AS_STRUCT(val)->name->str);
       break;
     }
+    case OBJ_INSTANCE: {
+      printf("{instanceof %s}", AS_INSTANCE(val)->strukt->name->str);
+      break;
+    }
     default:
       UNREACHABLE("print: unknown object type");
   }
@@ -230,6 +238,13 @@ Value object_to_string(VM* vm, Value val) {
       int len = 10 + name->length;
       char buff[len];
       len = snprintf(buff, len, "@struct[%s]", name->str);
+      return (create_string(vm, &vm->strings, buff, len, false));
+    }
+    case OBJ_INSTANCE: {
+      ObjString* name = AS_INSTANCE(val)->strukt->name;
+      int len = 12 + name->length;
+      char buff[len];
+      len = snprintf(buff, len, "@instance[%s]", name->str);
       return (create_string(vm, &vm->strings, buff, len, false));
     }
     default:
@@ -304,7 +319,15 @@ void free_object(VM* vm, Obj* obj) {
       break;
     }
     case OBJ_STRUCT: {
+      ObjStruct* st = (ObjStruct*)obj;
+      FREE_BUFFER(vm, st->fields.entries, HashEntry, st->fields.capacity);
       FREE(vm, obj, ObjStruct);
+      break;
+    }
+    case OBJ_INSTANCE: {
+      ObjInstance* ins = (ObjInstance*)obj;
+      FREE_BUFFER(vm, ins->fields.entries, HashEntry, ins->fields.capacity);
+      FREE(vm, obj, ObjInstance);
       break;
     }
   }
@@ -420,6 +443,14 @@ ObjStruct* create_struct(VM* vm, ObjString* name) {
   return strukt;
 }
 
+ObjInstance* create_instance(VM* vm, ObjStruct* strukt) {
+  ObjInstance* instance =
+      CREATE_OBJ(vm, ObjInstance, OBJ_INSTANCE, sizeof(ObjInstance));
+  instance->strukt = strukt;
+  hashmap_init(&instance->fields);
+  return instance;
+}
+
 inline char* get_func_name(ObjFn* fn) {
   return fn->name ? fn->name->str : "<anonymous>";
 }
@@ -453,7 +484,17 @@ static uint32_t hash_object(Obj* obj) {
       return ((ObjString*)obj)->hash;
     case OBJ_CLOSURE: {
       ObjFn* fn = ((ObjClosure*)obj)->func;
-      return hash_bits(fn->arity) ^ hash_bits(fn->code.length);
+      return fn->name->hash ^ hash_bits(fn->arity)
+          ^ hash_bits(fn->code.length);
+    }
+    case OBJ_STRUCT: {
+      ObjStruct* strukt = ((ObjStruct*)obj);
+      return strukt->name->hash ^ hash_bits(strukt->fields.length);
+    }
+    case OBJ_INSTANCE: {
+      ObjInstance* instance = (ObjInstance*)obj;
+      return instance->strukt->name->hash
+          ^ hash_bits(instance->fields.length);
     }
     default:
       // TODO: better error handling
@@ -558,9 +599,13 @@ Value hashmap_get(ObjHashMap* table, Value key) {
   return NOTHING_VAL;
 }
 
-bool hashmap_has_key(ObjHashMap* table, Value key) {
+bool hashmap_has_key(ObjHashMap* table, Value key, Value* value) {
   HashEntry* entry;
-  return find_entry(table->entries, table->capacity, &entry, key);
+  if (find_entry(table->entries, table->capacity, &entry, key)) {
+    *value = entry->value;
+    return true;
+  }
+  return false;
 }
 
 bool hashmap_remove(ObjHashMap* table, Value key) {

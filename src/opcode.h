@@ -37,6 +37,7 @@ typedef enum {
   $BUILD_MAP,
   $BUILD_CLOSURE,
   $BUILD_STRUCT,
+  $BUILD_INSTANCE,
   $POP,
   $POP_N,
   $DISPLAY,

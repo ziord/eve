@@ -292,11 +292,12 @@ perform_subscript_assign(VM* vm, Value var, Value subscript, Value value) {
   } else if (IS_HMAP(var)) {
     hashmap_put(AS_HMAP(var), vm, subscript, value);
     return true;
+  } else {
+    runtime_error(
+        vm,
+        "'%s' type is not subscript-assignable",
+        get_value_type(var));
   }
-  runtime_error(
-      vm,
-      "'%s' type is not subscript-assignable",
-      get_value_type(var));
   return false;
 }
 

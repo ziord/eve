@@ -2,6 +2,8 @@
 
 #include "vm.h"
 
+#define LOAD_FACTOR (0.75)
+
 void init_value_pool(ValuePool* vp) {
   vp->values = NULL;
   vp->length = 0;
@@ -9,7 +11,7 @@ void init_value_pool(ValuePool* vp) {
 }
 
 void free_value_pool(ValuePool* vp, VM* vm) {
-  FREE(vm, vp->values, Value);
+  FREE_BUFFER(vm, vp->values, Value, vp->capacity);
   init_value_pool(vp);
 }
 
@@ -32,8 +34,8 @@ void init_code(Code* code) {
 }
 
 void free_code(Code* code, VM* vm) {
-  FREE(vm, code->bytes, byte_t);
-  FREE(vm, code->lines, int);
+  FREE_BUFFER(vm, code->bytes, byte_t, code->capacity);
+  FREE_BUFFER(vm, code->lines, int, code->capacity);
   free_value_pool(&code->vpool, vm);
   init_code(code);
 }
@@ -65,9 +67,10 @@ char* get_object_type(Obj* obj) {
       return "struct";
     case OBJ_INSTANCE:
       return "instance";
-    default:
-      UNREACHABLE("unknown object type");
+    case OBJ_UPVALUE:
+      return "upvalue";
   }
+  UNREACHABLE("unknown object type");
 }
 
 char* get_value_type(Value val) {
@@ -88,15 +91,15 @@ void print_object(Value val, Obj* obj) {
   switch (obj->type) {
     case OBJ_STR: {
       printf("%s", AS_STRING(val)->str);
-      break;
+      return;
     }
     case OBJ_CLOSURE: {
       printf("{fn %s}", get_func_name(AS_CLOSURE(val)->func));
-      break;
+      return;
     }
     case OBJ_FN: {
       printf("{fn %s}", get_func_name(AS_FUNC(val)));
-      break;
+      return;
     }
     case OBJ_LIST: {
       ObjList* list = AS_LIST(val);
@@ -120,7 +123,7 @@ void print_object(Value val, Obj* obj) {
         }
       }
       printf("]");
-      break;
+      return;
     }
     case OBJ_HMAP: {
       ObjHashMap* map = AS_HMAP(val);
@@ -161,23 +164,22 @@ void print_object(Value val, Obj* obj) {
         }
       }
       printf("}");
-      break;
+      return;
     }
     case OBJ_UPVALUE: {
       printf("{upvalue}");
-      break;
+      return;
     }
     case OBJ_STRUCT: {
       printf("{struct %s}", AS_STRUCT(val)->name->str);
-      break;
+      return;
     }
     case OBJ_INSTANCE: {
       printf("{instanceof %s}", AS_INSTANCE(val)->strukt->name->str);
-      break;
+      return;
     }
-    default:
-      UNREACHABLE("print: unknown object type");
   }
+  UNREACHABLE("print: unknown object type");
 }
 
 void print_value(Value val) {
@@ -247,9 +249,8 @@ Value object_to_string(VM* vm, Value val) {
       len = snprintf(buff, len, "@instance[%s]", name->str);
       return (create_string(vm, &vm->strings, buff, len, false));
     }
-    default:
-      UNREACHABLE("object value to string");
   }
+  UNREACHABLE("object value to string");
 }
 
 Value value_to_string(VM* vm, Value val) {
@@ -281,58 +282,6 @@ Value value_to_string(VM* vm, Value val) {
   }
 }
 
-void free_object(VM* vm, Obj* obj) {
-  switch (obj->type) {
-    case OBJ_STR: {
-      ObjString* st = (ObjString*)obj;
-      FREE_BUFFER(vm, st->str, char, st->length + 1);
-      FREE(vm, st, ObjString);
-      break;
-    }
-    case OBJ_LIST: {
-      ObjList* list = (ObjList*)obj;
-      size_t size =
-          sizeof(ObjList) + (sizeof(Value) * list->elems.capacity);
-      FREE_FLEX(vm, list, size);
-      break;
-    }
-    case OBJ_HMAP: {
-      ObjHashMap* map = (ObjHashMap*)obj;
-      FREE_BUFFER(vm, map->entries, HashEntry, map->capacity);
-      FREE(vm, map, ObjHashMap);
-      break;
-    }
-    case OBJ_FN: {
-      ObjFn* func = (ObjFn*)obj;
-      free_code(&func->code, vm);
-      FREE(vm, func, ObjFn);
-      break;
-    }
-    case OBJ_CLOSURE: {
-      ObjClosure* closure = (ObjClosure*)obj;
-      FREE_BUFFER(vm, closure->env, ObjUpvalue*, closure->env_len);
-      FREE(vm, closure, ObjClosure);
-      break;
-    }
-    case OBJ_UPVALUE: {
-      FREE(vm, obj, ObjUpvalue);
-      break;
-    }
-    case OBJ_STRUCT: {
-      ObjStruct* st = (ObjStruct*)obj;
-      FREE_BUFFER(vm, st->fields.entries, HashEntry, st->fields.capacity);
-      FREE(vm, obj, ObjStruct);
-      break;
-    }
-    case OBJ_INSTANCE: {
-      ObjInstance* ins = (ObjInstance*)obj;
-      FREE_BUFFER(vm, ins->fields.entries, HashEntry, ins->fields.capacity);
-      FREE(vm, obj, ObjInstance);
-      break;
-    }
-  }
-}
-
 /*********************
  *
  * > Object routines
@@ -342,9 +291,13 @@ void free_object(VM* vm, Obj* obj) {
 static uint32_t hash_string(const char* str, int len);
 
 Obj* create_object(VM* vm, ObjTy ty, size_t size) {
+#ifdef EVE_DEBUG_GC
+  printf("  [*] allocate for type %d\n", ty);
+#endif
   Obj* obj =
       vm_alloc(vm, NULL, 0, size, "allocation failed -- create_object");
   obj->type = ty;
+  obj->marked = false;
   // link obj to vm's collection of allocated objects
   obj->next = vm->objects;
   vm->objects = obj;
@@ -362,6 +315,8 @@ Value create_string(
   Value val;
   if (!string) {
     string = CREATE_OBJ(vm, ObjString, OBJ_STR, sizeof(ObjString));
+    val = OBJ_VAL(string);
+    vm_push_stack(vm, val);  // gc reasons
     string->hash = hash;
     if (!is_alloc) {
       string->str = ALLOC(vm, char, len + 1);
@@ -371,10 +326,10 @@ Value create_string(
       string->str = str;
       string->length = len;
       // track the already allocated bytes
-      vm->bytes_alloc += len;
+      vm->gc.bytes_allocated += (len + 1);
     }
-    val = OBJ_VAL(string);
     hashmap_put(table, vm, val, FALSE_VAL);
+    vm_pop_stack(vm);  // gc reasons
   } else {
     val = OBJ_VAL(string);
     if (is_alloc) {
@@ -414,14 +369,13 @@ ObjFn* create_function(VM* vm) {
 }
 
 ObjClosure* create_closure(VM* vm, ObjFn* func) {
+  Env env = GROW_BUFFER(vm, NULL, ObjUpvalue*, 0, func->env_len);
+  for (int i = 0; i < func->env_len; i++) {
+    env[i] = NULL;
+  }
   ObjClosure* closure =
       CREATE_OBJ(vm, ObjClosure, OBJ_CLOSURE, sizeof(ObjClosure));
-  if (func->env_len) {
-    closure->env = GROW_BUFFER(vm, NULL, ObjUpvalue*, 0, func->env_len);
-    for (int i = 0; i < func->env_len; i++) {
-      closure->env[i] = NULL;
-    }
-  }
+  closure->env = env;
   closure->func = func;
   closure->env_len = func->env_len;
   return closure;
@@ -432,6 +386,7 @@ ObjUpvalue* create_upvalue(VM* vm, Value* location) {
       CREATE_OBJ(vm, ObjUpvalue, OBJ_UPVALUE, sizeof(ObjUpvalue));
   upvalue->next = NULL;
   upvalue->location = location;
+  upvalue->value = NONE_VAL;
   return upvalue;
 }
 
@@ -575,7 +530,7 @@ static void rehash(ObjHashMap* table, VM* vm) {
         table->entries[i].value,
         capacity);
   }
-  FREE(vm, table->entries, HashEntry);
+  FREE_BUFFER(vm, table->entries, HashEntry, table->capacity);
   table->entries = new_entries;
   table->capacity = capacity;
 }

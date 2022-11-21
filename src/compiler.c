@@ -41,8 +41,8 @@ void c_control(
     int continue_exit,
     int break_exit);
 
-Compiler new_compiler(AstNode* node, ObjFn* func, VM* vm) {
-  Compiler compiler = {
+void new_compiler(Compiler* compiler, AstNode* node, ObjFn* func, VM* vm) {
+  *compiler = (Compiler) {
       .root = node,
       .func = func,
       .vm = vm,
@@ -53,8 +53,8 @@ Compiler new_compiler(AstNode* node, ObjFn* func, VM* vm) {
       .errors = 0,
       .current_loop = {.scope = 0},
       .enclosing = NULL};
-  reserve_local(&compiler);
-  return compiler;
+  vm->compiler = compiler;
+  reserve_local(compiler);
 }
 
 void compile_error(Compiler* compiler, char* fmt, ...) {
@@ -610,7 +610,8 @@ void c_function(Compiler* compiler, AstNode* node) {
           false));
     }
   }
-  Compiler func_compiler = new_compiler(node, fn_obj, compiler->vm);
+  Compiler func_compiler;
+  new_compiler(&func_compiler, node, fn_obj, compiler->vm);
   func_compiler.enclosing = compiler;
   // compile params
   func_compiler.scope++;  // make params local to the function
@@ -635,6 +636,9 @@ void c_function(Compiler* compiler, AstNode* node) {
     emit_byte(compiler, $DEFINE_GLOBAL, func->line);
     emit_byte(compiler, name_slot, func->line);
   }
+  // new_compiler() called above resets vm->compiler to func_compiler,
+  // so we reset it here.
+  compiler->vm->compiler = compiler;
 #ifdef EVE_DEBUG
   if (!func_compiler.errors) {
     dis_code(&fn_obj->code, get_func_name(fn_obj));

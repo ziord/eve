@@ -55,6 +55,14 @@ inline static void push_stack(VM* vm, Value val) {
   vm->sp++;
 }
 
+Value vm_pop_stack(VM* vm) {
+  return pop_stack(vm);
+}
+
+void vm_push_stack(VM* vm, Value val) {
+  push_stack(vm, val);
+}
+
 inline static bool push_frame(VM* vm, CallFrame frame) {
   if (vm->frame_count >= FRAME_MAX) {
     runtime_error(vm, "Stack overflow: too many call frames");
@@ -92,30 +100,34 @@ VM new_vm() {
       .objects = NULL,
       .sp = NULL,
       .frame_count = 0,
-      .upvalues = NULL};
+      .is_compiling = true,
+      .upvalues = NULL,
+      .compiler = NULL};
+  vm.sp = vm.stack;
   hashmap_init(&vm.strings);
   hashmap_init(&vm.globals);
+  gc_init(&vm.gc);
   return vm;
 }
 
 void free_vm(VM* vm) {
   if (vm->globals.entries) {
-    FREE(vm, vm->globals.entries, HashEntry);
+    FREE_BUFFER(vm, vm->globals.entries, HashEntry, vm->globals.capacity);
   }
   if (vm->strings.entries) {
-    FREE(vm, vm->strings.entries, HashEntry);
+    FREE_BUFFER(vm, vm->strings.entries, HashEntry, vm->strings.capacity);
   }
   Obj* next;
   for (Obj* obj = vm->objects; obj != NULL; obj = next) {
     next = obj->next;
     free_object(vm, obj);
   }
+  gc_free(&vm->gc);
 }
 
 void boot_vm(VM* vm, ObjFn* func) {
   vm->fp = vm->frames;
   vm->sp = vm->stack;
-  vm->bytes_alloc = 0;
   // assumes that 'strings' hashmap has been initialized already by the compiler
   hashmap_init(&vm->globals);
   ObjClosure* closure = create_closure(vm, func);
@@ -125,6 +137,7 @@ void boot_vm(VM* vm, ObjFn* func) {
       .stack = vm->sp};
   push_frame(vm, frame);
   push_stack(vm, OBJ_VAL(closure));
+  vm->is_compiling = false;
 }
 
 static IResult runtime_error(VM* vm, char* fmt, ...) {
@@ -184,17 +197,24 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
       push_stack(vm, res);
       return true;
     } else {
+      push_stack(vm, val);  // gc reasons
+      push_stack(vm, subscript);  // gc reasons
       runtime_error(
           vm,
           "hashmap has no such key: '%s'",
           AS_STRING(value_to_string(vm, subscript))->str);
+      vm->sp -= 2;  // gc reasons
     }
   } else if (IS_STRING(val)) {
     ObjString* str = AS_STRING(val);
     int64_t index;
     if (validate_subscript(vm, subscript, str->length, "string", &index)) {
+      // gc reasons
+      push_stack(vm, val);
+      push_stack(vm, subscript);
       Value new_str =
           create_string(vm, &vm->strings, &str->str[index], 1, false);
+      vm->sp -= 2;
       push_stack(vm, new_str);
       return true;
     }
@@ -236,7 +256,10 @@ static bool perform_prop_access(VM* vm, Value value, Value property) {
        * belong to the struct (i.e. key is NOTHING_VAL), we can safely set it as `None` on the instance
        */
       if (res == NOTHING_VAL) {
+        push_stack(vm, value);  // gc reasons
+        push_stack(vm, property);  // gc reasons
         hashmap_put(&instance->fields, vm, property, NONE_VAL);
+        vm->sp -= 2;  // gc reasons
         push_stack(vm, NONE_VAL);
         return true;
       }
@@ -365,7 +388,8 @@ IResult run(VM* vm) {
       }
       case $DEFINE_GLOBAL: {
         Value var = READ_CONST(vm);
-        hashmap_put(&vm->globals, vm, var, pop_stack(vm));
+        hashmap_put(&vm->globals, vm, var, PEEK_STACK(vm));
+        pop_stack(vm);
         continue;
       }
       case $GET_GLOBAL: {
@@ -393,8 +417,8 @@ IResult run(VM* vm) {
         Value var = READ_CONST(vm);
         if (hashmap_put(&vm->globals, vm, var, PEEK_STACK(vm))) {
           // true if key is new - new insertion, false if key already exists
-          hashmap_remove(&vm->globals, var);
           ObjString* str = AS_STRING(value_to_string(vm, var));
+          hashmap_remove(&vm->globals, var);
           return runtime_error(
               vm,
               "use of undefined variable '%s'",
@@ -411,12 +435,14 @@ IResult run(VM* vm) {
         continue;
       }
       case $SET_SUBSCRIPT: {
-        Value subscript = pop_stack(vm);
-        Value var = pop_stack(vm);
-        Value value = PEEK_STACK(vm);
+        Value subscript = PEEK_STACK(vm);
+        Value var = PEEK_STACK_AT(vm, 1);  // gc reasons
+        Value value = PEEK_STACK_AT(vm, 2);  // gc reasons
         if (!perform_subscript_assign(vm, var, subscript, value)) {
           return RESULT_RUNTIME_ERROR;
         }
+        pop_stack(vm);  // gc reasons
+        pop_stack(vm);  // gc reasons
         continue;
       }
       case $RET: {
@@ -546,7 +572,7 @@ IResult run(VM* vm) {
       }
       case $SET_PROPERTY: {
         Value property = READ_CONST(vm);
-        Value var = pop_stack(vm);
+        Value var = PEEK_STACK(vm);
         if (IS_INSTANCE(var)) {
           ObjInstance* instance = AS_INSTANCE(var);
           // true if 'property' is a new key
@@ -554,7 +580,7 @@ IResult run(VM* vm) {
                   &instance->fields,
                   vm,
                   property,
-                  PEEK_STACK(vm))) {
+                  PEEK_STACK_AT(vm, 1))) {
             hashmap_remove(&instance->fields, property);
             return runtime_error(
                 vm,
@@ -562,6 +588,7 @@ IResult run(VM* vm) {
                 instance->strukt->name->str,
                 AS_STRING(property)->str);
           }
+          pop_stack(vm);
         } else {
           return runtime_error(
               vm,
@@ -583,14 +610,16 @@ IResult run(VM* vm) {
         continue;
       }
       case $ASSERT: {
-        Value test = pop_stack(vm);
-        Value msg = pop_stack(vm);
+        Value test = PEEK_STACK(vm);  // gc reasons
+        Value msg = PEEK_STACK_AT(vm, 1);  // gc reasons
         if (value_falsy(test)) {
           return runtime_error(
               vm,
               "Assertion Failed: %s",
               AS_STRING(value_to_string(vm, msg))->str);
         }
+        pop_stack(vm);  // gc reasons
+        pop_stack(vm);  // gc reasons
         continue;
       }
       case $JMP: {
@@ -631,39 +660,40 @@ IResult run(VM* vm) {
       case $BUILD_MAP: {
         uint32_t len = READ_BYTE(vm) * 2;
         ObjHashMap* map = create_hashmap(vm);
+        push_stack(vm, OBJ_VAL(map));  // gc reasons
         Value key, val;
         for (int i = 0; i < len; i += 2) {
-          val = PEEK_STACK_AT(vm, i);
-          key = PEEK_STACK_AT(vm, i + 1);
+          val = PEEK_STACK_AT(vm, i + 1);
+          key = PEEK_STACK_AT(vm, i + 2);
           hashmap_put(map, vm, key, val);
         }
-        vm->sp -= len;
+        vm->sp -= len + 1;  // +1 for map (gc reasons)
         push_stack(vm, OBJ_VAL(map));
         continue;
       }
       case $BUILD_CLOSURE: {
-        Value val = READ_CONST(vm);
-        ObjClosure* closure = create_closure(vm, AS_FUNC(val));
+        ObjClosure* closure = create_closure(vm, AS_FUNC(READ_CONST(vm)));
+        push_stack(vm, OBJ_VAL(closure));
         for (int i = 0; i < closure->env_len; i++) {
           byte_t index = READ_BYTE(vm);
           byte_t is_local = READ_BYTE(vm);
           if (is_local) {
             closure->env[i] = capture_upvalue(vm, vm->fp->stack + index);
           } else {
-            closure->env[i] = vm->fp->closure->env[i];
+            closure->env[i] = vm->fp->closure->env[index];
           }
         }
-        push_stack(vm, OBJ_VAL(closure));
         continue;
       }
       case $BUILD_STRUCT: {
         Value name = READ_CONST(vm);
         byte_t field_count = READ_BYTE(vm) * 2;  // k-v pairs
         ObjStruct* strukt = create_struct(vm, AS_STRING(name));
+        push_stack(vm, OBJ_VAL(strukt));  // gc reasons
         Value var, val;
         for (byte_t i = 0; i < field_count; i += 2) {
-          val = PEEK_STACK_AT(vm, i);
-          var = PEEK_STACK_AT(vm, i + 1);
+          val = PEEK_STACK_AT(vm, i + 1);
+          var = PEEK_STACK_AT(vm, i + 2);
           if (!hashmap_put(&strukt->fields, vm, var, val)) {
             return runtime_error(
                 vm,
@@ -672,12 +702,12 @@ IResult run(VM* vm) {
                 AS_STRING(value_to_string(vm, var))->str);
           }
         }
-        vm->sp -= field_count;
+        vm->sp -= field_count + 1;  // +1 for strukt (gc reasons)
         push_stack(vm, OBJ_VAL(strukt));
         continue;
       }
       case $BUILD_INSTANCE: {
-        Value var = pop_stack(vm);
+        Value var = PEEK_STACK(vm);  // gc reasons
         byte_t field_count = READ_BYTE(vm) * 2;  // k-v pairs
         if (!IS_STRUCT(var)) {
           return runtime_error(
@@ -688,9 +718,10 @@ IResult run(VM* vm) {
         Value key, val, check;
         ObjStruct* strukt = AS_STRUCT(var);
         ObjInstance* instance = create_instance(vm, strukt);
+        push_stack(vm, OBJ_VAL(instance));  // gc reasons
         for (int i = 0; i < field_count; i += 2) {
-          val = PEEK_STACK_AT(vm, i);
-          key = PEEK_STACK_AT(vm, i + 1);
+          val = PEEK_STACK_AT(vm, i + 2);
+          key = PEEK_STACK_AT(vm, i + 3);
           if (hashmap_has_key(&strukt->fields, key, &check)
               && check == NOTHING_VAL) {
             // only store fields with NOTHING_VAL value flag in the instance's field
@@ -702,7 +733,7 @@ IResult run(VM* vm) {
                 AS_STRING(key)->str);
           }
         }
-        vm->sp -= field_count;
+        vm->sp -= field_count + 2;  // +2 for var and instance (gc reasons)
         push_stack(vm, OBJ_VAL(instance));
         continue;
       }

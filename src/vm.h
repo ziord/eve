@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "debug.h"
+#include "gc.h"
 #include "util.h"
 
 #define FRAME_MAX (0x50)
@@ -22,18 +23,22 @@ typedef struct {
 } CallFrame;
 
 typedef struct VM {
+  bool is_compiling;
   int frame_count;
-  size_t bytes_alloc;
   ObjHashMap strings;
   ObjHashMap globals;
+  GC gc;
   Value stack[STACK_MAX];
   CallFrame frames[FRAME_MAX];
   CallFrame* fp;
   Value* sp;
   ObjUpvalue* upvalues;
   Obj* objects;
+  struct Compiler* compiler;
 } VM;
 
+Value vm_pop_stack(VM* vm);
+void vm_push_stack(VM* vm, Value val);
 VM new_vm();
 void free_vm(VM* vm);
 void boot_vm(VM* vm, ObjFn* func);

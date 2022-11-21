@@ -13,6 +13,12 @@ void vec_push(Vec* vec, void* item) {
   vec->items[vec->len++] = item;
 }
 
+inline void* vec_pop(Vec* vec) {
+  if (!vec || !vec->len)
+    return NULL;
+  return vec->items[--vec->len];
+}
+
 inline int vec_size(Vec* vec) {
   return vec->len;
 }

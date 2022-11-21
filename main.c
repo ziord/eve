@@ -21,7 +21,8 @@ int execute(char* fp) {
   }
   // compile
   ObjFn* func = create_function(&vm);
-  Compiler compiler = new_compiler(root, func, &vm);
+  Compiler compiler;
+  new_compiler(&compiler, root, func, &vm);
   compile(&compiler);
   if (compiler.errors) {
     cleanup(&parser, src);

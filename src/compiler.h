@@ -40,7 +40,7 @@ typedef struct Compiler {
   struct Compiler* enclosing;
 } Compiler;
 
-Compiler new_compiler(AstNode* node, ObjFn* func, VM* vm);
+void new_compiler(Compiler* compiler, AstNode* node, ObjFn* func, VM* vm);
 void compile(Compiler* compiler);
 
 #endif  //EVE_COMPILER_H

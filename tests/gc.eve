@@ -1,0 +1,506 @@
+fn () {
+#*
+* Function declarations tests
+*#
+
+## no args
+fn printer() {
+    show "I'm okay";
+}
+
+assert printer;
+assert printer() == None;
+
+## single arg
+fn printer(value) {
+    show value;
+    return value;
+}
+
+assert printer(2) == 2;
+
+## multiple args
+fn add(a, b) {
+  show a, b;
+  return a + b;
+}
+
+assert add(5, 12) == 17;
+
+## scopes
+{
+    fn printer(_unused) {
+        return "oops";
+    }
+    assert printer(0xdead) == "oops";
+}
+
+#*
+Function expression tests
+*#
+
+## no args
+let adder = fn () {
+    return add(3, 5);
+};
+
+assert adder() == 8;
+
+let foo = fn () {
+    return [add];
+};
+
+assert foo()[-1](5, 8) == 13;
+
+assert fn () {
+         return add(10, 5);
+     }() == 15;
+
+assert (fn () {
+         return add(10, 5);
+     })() == 15;
+
+## single arg
+assert (fn(){})() == None;
+assert fn(){}() == None;
+
+fn (a) {
+    return a;
+};
+
+fn (a) {
+    return a;
+}(5);
+
+assert fn(a) {
+           return a**a;
+       }(5) == 3125;
+
+let x = 0xff + fn () { return foo()[-1](5, 8); }() + 12;
+assert x == 280;
+
+if fn(a){return a;}(5) == 25/5 {
+    assert true;
+} else {
+    assert false;
+}
+
+## multiple args
+assert fn (a, b) {
+    return a - b;
+}(5, 10) == -5;
+
+let x = [fn () { return 0xdeadbeef; }, fn (a) { return a ** a; }];
+let y = #{x[0](): x[1](10)};
+assert y[0xdeadbeef] == 1e+10;
+
+## empty 'return' should return None
+assert fn () {return;}() == None;
+
+fn fax() {
+    show "nothing";
+    return;
+}
+
+assert fax() == None;
+
+fn maybe(x) {
+    if x > 5 {
+        return x * 12;
+    } else {
+        return;
+    }
+}
+
+assert maybe(2) == None;
+assert maybe(5) == None;
+assert maybe(12) == 144;
+
+fn should_be_5() {
+    return 5;
+    let x = 10;
+    return 10;
+    return 15;
+    return "deadcode" + x;  ## runtime error
+}
+
+assert should_be_5() == 5;
+}();
+
+
+fn () {
+assert #{"name": "jon", 5: 0xffff, 888: 5}["name"] == #{1: "jon"}[1];
+show #{true: None, None: false, false: None}, 2 / 4 * 0xff, ["yo!"];
+assert #{"ball": 0xb, 2: "b", 3: "c", "dog": [1, 2, 3, #{"a": "apple", "b": "bag"}, "crab"]}["dog"][-2]["a"][2] == "p";
+let x = #{"a": 0xff, "b": false};
+x["a"] <<= 5;
+x["a"] |= 2;
+x["a"] ^= 4;
+x["a"] += x["a"];
+x["a"] -= 12;
+x["a"] *= 8;
+x["a"] **= 3;
+x["a"] /= 8;
+assert x["a"] >= 2.78189e+14;
+x["a"] = #{"test": "passing"};
+assert x["a"]["test"] == "passing";
+x["a"]["fan"] = [1, 2, 3];
+assert x["a"]["fan"][-2] == 2;
+assert x;
+
+let dict = #{};
+struct Foo {}
+dict[Foo] = 5;
+let a = Foo;
+fn Foo() {}
+let b = Foo;
+dict[Foo] = 10;
+dict["Foo"] = 15;
+
+assert dict[a] == 5;
+assert dict[b] == 10;
+assert dict["Foo"] == 15;
+
+let dict = #{};
+struct Foo {@compose x; @declare y => "p";}
+let f = Foo {x = 5};
+dict[Foo] = 5;
+dict[f] = f;
+let a = Foo;
+fn Foo() {}
+let b = Foo;
+dict[Foo] = 10;
+dict["Foo"] = 15;
+assert dict[f].x == 5;
+f.x = fn () {return "true";};
+assert dict[f].x() == "true";
+
+assert dict[a] == 5;
+assert dict[b] == 10;
+assert dict["Foo"] == 15;
+
+
+struct Bar {
+    @declare pi => 22/7;
+    @declare print => fn (arg) { show arg; return Bar::pi; };
+    @compose push, pop, pin;
+}
+
+let x = Bar { push = "deadly", pop = fn() {return 5;}, pin = Bar };
+show x;
+assert x;
+show x.push;
+assert x.push == "deadly";
+assert x.pop() == 5;
+assert x.pin::pi == Bar::pi;
+assert x.pin::print(3) == Bar::pi;
+
+let y = Bar {};
+assert y;
+assert x != y;
+show y.pin, y.push, y.pop;
+assert y.pin == None;
+assert y.push == None;
+assert y.pop == None;
+
+x.pin = 5;
+assert x.pin == 5;
+assert x.pin != y.pin;
+
+x.pin *= 4;
+assert x.pin == 20;
+
+x.pin >>= 1;
+assert x.pin == 10;
+
+y.pin = x;
+assert y.pin;
+assert y.pin.pin == 10;
+
+
+let dict = #{y.pin: Bar};
+assert dict[y.pin] == Bar;
+assert dict[y.pin]::pi == 22/7;
+}();
+
+
+fn () {
+show [1, 2, 0xff * 24, 5 * 3 -12, "fishy", [1, 2, 0xff * 24, 5 * 3 -12, "fishy"]];
+show [[[[[[[[[[[[[[[[[[[[[[[[[1, 2, 3, 4]]]]]]]]]]]]]]]]]]]]]]]]];
+assert [1, 2, 3][-1] == 3;
+assert [3, 4, 5, 6][0] == 3;
+assert [[[[[[[[[[[[[[[[[[[[[[[[[1, 2, 3, 4]]]]]]]]]]]]]]]]]]]]]]]]][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1][-1] == 4;
+let x = [1, 2, 3];
+x[-2] **= 5;
+assert x[1] == 32;
+assert x;
+assert x[1] == x[-2];
+
+}();
+
+fn () {
+struct Data {
+    @compose clear, add, length, print, get;
+    @declare new => fn () {
+        let list = [None, None, None, None, None, None];
+        let len = 0;
+        let cap = 6;
+        fn _clear() {
+            let i = 0;
+            while i < len {
+                list[i] = None;
+                i += 1;
+            }
+            len -= i;
+        }
+        fn add(val) {
+            list[len] = val;
+            len += 1;
+        }
+        fn _len() {
+            return len;
+        }
+        fn get(index) {
+            if index < len {
+                return list[index];
+            }
+            return None;
+        }
+        fn _print() {
+            let i = 0;
+            while i < len {
+               show list[i];
+               i += 1;
+            }
+        }
+        fn setup() {
+            let d = Data { clear = _clear, add = add, length = _len, print = _print, get = get };
+            return d;
+        }
+        return setup();
+    };
+}
+
+let d = Data::new();
+assert d.clear != None;
+assert d.add != None;
+assert d.length != None;
+assert d.print != None;
+assert d.get != None;
+d.add(5);
+d.add("foxes");
+d.add("cats");
+d.print();
+assert d.get(0) == 5;
+assert d.get(1) == "foxes";
+assert d.get(2) == "cats";
+assert d.get(3) == None;
+assert d.get(30) == None;
+assert d.length() == 3;
+d.clear();
+assert d.length() == 0;
+assert d.get(0) == None;
+assert d.get(10) == None;
+}();
+
+fn () {
+assert "foo\t\t\t\t\t\b\t\t\t\t\t\thappy";
+assert "fox\t"[-1] == "\t";
+assert "fox\t"[0] == "f";
+assert "fox\t"[3] == "\t";
+assert "fish - \r\n\b\a - fan" == "fish - \r\n\b\a - fan";
+}();
+
+fn () {
+struct Empty{}
+assert Empty;
+
+struct Bar {
+    @declare pi => 22/7;
+    @declare print => fn (arg) { show arg; return Bar::pi; };
+}
+
+struct Foo {
+  @compose: x;
+  @compose y, z;
+  @declare p => 500;
+  @declare bar => Bar;
+  @declare q => 60, v => "foxy";
+  @declare bax => fn () { return 0xff; }, none => None;
+}
+
+{
+
+    struct Bar {
+      @compose: x;
+      @compose y, z;
+      @declare q => 60, v => "foxy";
+    }
+    assert Bar;
+    assert Bar != Foo;
+
+}
+
+show Foo;
+assert Foo && Foo == Foo;
+
+show Foo::p, Foo::q;
+assert Foo::q == 60;
+assert Foo::v == "foxy";
+assert Foo::none == None;
+assert Foo::bax() == 255;
+assert Foo::bar::pi == 22/7;
+assert Foo::bar::print("0xdeadbeef") == 22/7;
+
+let ret_struct = fn () {
+    return Bar;
+};
+
+assert ret_struct()::print("ox") == Bar::pi;
+assert (ret_struct()::print)("ox") == Bar::pi;
+assert (ret_struct()::print)("ox") == ret_struct()::print("ba");
+}();
+
+fn () {
+#* Eve supports a very limited/restricted form of tail calls *#
+
+fn check(x) {
+    if x >= 50 {
+        return x;
+    }
+    return check(x+1);
+}
+
+fn fib(n, a, b) {
+    if n == 0 {
+        return a;
+    } else if n == 1 {
+        return b;
+    }
+    return fib(n - 1, b, a + b);
+}
+
+assert check(1) == 50;
+assert fib(10, 0, 1) == 55;
+
+let y = None;
+
+fn check2(x) {
+    if x >= 50 {
+        return x;
+    }
+    y = fn () {
+        return x;
+    };
+    return check2(x*2);
+}
+assert check2(3) == 96;
+assert y() == 48, "last captured 'x' should be 48";
+}();
+
+fn () {
+let x = 5;
+let y = #{x: x ** 2, "facts": "this is a pilot"};
+assert y[x] == 25;
+let z = [x, y];
+assert z[-1] == y;
+x = z;
+assert x == z;
+let p_0 = (z[-2] += 10);
+let _p1 = p_0;
+let p2 = p_0 * _p1;
+assert _p1 == p_0 && p2 == _p1 ** 2;
+assert p_0 == 15 && z[-2] == 15;
+assert z[-1]["facts"] == "this is a pilot";
+
+let x = 0;
+let y = 0;
+while x < 10 {
+    x += 1;
+    if x > 5 {
+        break;
+    }
+    while y < x {
+        y += 2;
+        if y >= x {
+            break;
+        }
+    }
+    ## show y;
+}
+assert x == y;
+
+let a = 0;
+while true {
+    while true {
+        a += 1;
+        if a < 500 {
+            continue;
+        } else {
+            break;
+        }
+    }
+    break;
+}
+assert a == 500;
+
+let a = 0;
+while a < 10 {
+    let x = 0;
+    while x < 10 {
+        x += 1;
+        continue;
+    }
+    show "x is:", x;
+    let y = 5;
+    while y < 15 {
+        let k = 10;
+        let k2 = 0x10;
+        let k3 = 10.3e5;
+        let k4 = 10.e3;
+        let k5 = 10.e-3;
+        y += 1;
+        continue;
+    }
+    assert y == 15;
+    while y < 15 || y == 15 {
+        let k = 10;
+        let k2 = 0x10;
+        let k3 = 10.3e5;
+        let k4 = 10.e3;
+        let k5 = 10.e-3;
+        y += 1;
+        break;
+    }
+    assert y == 16;
+    ## show "y is:", y;
+    a += 1;
+}
+
+assert x == y;
+assert x == 6;
+
+while true {
+    while true {
+        while true {
+            while true {
+                while true {
+                    x += y;
+                    break;
+                }
+                x += y;
+                break;
+            }
+            x += y;
+            break;
+        }
+        x += y;
+        break;
+    }
+    x += y;
+    break;
+}
+assert x == 36;
+show "OK-OK";
+assert "OK";
+}();

@@ -60,8 +60,6 @@ typedef uint64_t Value;
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
 
-#define LOAD_FACTOR (0.75)
-
 typedef struct {
   int length;
   int capacity;
@@ -95,6 +93,7 @@ typedef enum {
 
 typedef struct Obj {
   ObjTy type;
+  bool marked;
   struct Obj* next;
 } Obj;
 
@@ -178,6 +177,7 @@ void free_value_pool(ValuePool* vp, VM* vm);
 int write_value(ValuePool* vp, Value v, VM* vm);
 char* get_value_type(Value val);
 void print_value(Value val);
+void print_object(Value val, Obj* obj);
 bool value_falsy(Value v);
 bool value_equal(Value a, Value b);
 Value object_to_string(VM* vm, Value val);

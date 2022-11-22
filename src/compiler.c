@@ -46,7 +46,7 @@ void new_compiler(
     AstNode* node,
     ObjFn* func,
     VM* vm,
-    char* module_name) {
+    char* fpath) {
   *compiler = (Compiler) {
       .root = node,
       .func = func,
@@ -59,19 +59,13 @@ void new_compiler(
       .errors = 0,
       .current_loop = {.scope = 0},
       .enclosing = NULL};
-  if (module_name) {
-    Value name = create_string(
-        vm,
-        &vm->strings,
-        module_name,
-        (int)strlen(module_name),
-        false);
+  if (fpath) {
+    Value name =
+        create_string(vm, &vm->strings, fpath, (int)strlen(fpath), false);
     compiler->module = create_module(vm, AS_STRING(name));
     compiler->func->module = compiler->module;
   }
-  if (!vm->compiler) {
-    vm->compiler = compiler;
-  }
+  vm->compiler = compiler;
   reserve_local(compiler);
 }
 

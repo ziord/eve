@@ -71,8 +71,6 @@ char* get_object_type(Obj* obj) {
       return "upvalue";
     case OBJ_MODULE:
       return "module";
-    case OBJ_CFN:
-      return "builtin_function";
   }
   UNREACHABLE("unknown object type");
 }
@@ -510,11 +508,6 @@ static uint32_t hash_object(Obj* obj) {
       ObjFn* fn = ((ObjClosure*)obj)->func;
       return fn->name->hash ^ hash_bits(fn->arity)
           ^ hash_bits(fn->code.length);
-    }
-    case OBJ_CFN: {
-      ObjCFn* fn = (ObjCFn*)obj;
-      int len = (int)strlen(fn->name);
-      return hash_string(fn->name, len) ^ hash_bits(fn->arity);
     }
     case OBJ_MODULE:
     case OBJ_STRUCT: {

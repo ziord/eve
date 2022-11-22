@@ -24,6 +24,7 @@ void free_store(NodeStore* store) {
       free(node);
     }
   }
+  vec_free(&store->nodes);
 }
 
 OpTy get_op(TokenTy ty) {

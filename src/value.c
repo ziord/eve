@@ -249,6 +249,9 @@ Value object_to_string(VM* vm, Value val) {
       len = snprintf(buff, len, "@instance[%s]", name->str);
       return (create_string(vm, &vm->strings, buff, len, false));
     }
+    case OBJ_FN:
+    case OBJ_UPVALUE:
+      break;
   }
   UNREACHABLE("object value to string");
 }

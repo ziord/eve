@@ -154,7 +154,7 @@ typedef struct {
 typedef struct {
   Obj obj;
   ObjHashMap fields;
-  ObjStruct* strukt;  // TODO: possibly do not need this now
+  ObjStruct* strukt;
 } ObjInstance;
 
 inline static Value num_to_val(double num) {

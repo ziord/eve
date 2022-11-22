@@ -30,17 +30,23 @@ typedef struct Compiler {
   int locals_count;
   int controls_count;
   int upvalues_count;
-  AstNode* root;
-  ObjFn* func;
   LocalVar locals[CONST_MAX];
   Upvalue upvalues[CONST_MAX];
   LoopVar controls[MAX_CONTROLS];
   LoopVar current_loop;
   VM* vm;
+  AstNode* root;
+  ObjFn* func;
   struct Compiler* enclosing;
+  ObjStruct* module;
 } Compiler;
 
-void new_compiler(Compiler* compiler, AstNode* node, ObjFn* func, VM* vm);
+void new_compiler(
+    Compiler* compiler,
+    AstNode* node,
+    ObjFn* func,
+    VM* vm,
+    char* fpath);
 void compile(Compiler* compiler);
 
 #endif  //EVE_COMPILER_H

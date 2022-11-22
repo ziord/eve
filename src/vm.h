@@ -26,7 +26,7 @@ typedef struct VM {
   bool is_compiling;
   int frame_count;
   ObjHashMap strings;
-  ObjHashMap globals;
+  ObjHashMap modules;
   GC gc;
   Value stack[STACK_MAX];
   CallFrame frames[FRAME_MAX];

@@ -57,6 +57,7 @@ void free_object(VM* vm, Obj* obj) {
       FREE(vm, obj, ObjUpvalue);
       break;
     }
+    case OBJ_MODULE:
     case OBJ_STRUCT: {
       ObjStruct* st = (ObjStruct*)obj;
       FREE_BUFFER(vm, st->fields.entries, HashEntry, st->fields.capacity);
@@ -72,17 +73,17 @@ void free_object(VM* vm, Obj* obj) {
   }
 }
 
-void remove_whites(VM* vm) {
+void remove_whites(ObjHashMap* map) {
   HashEntry* entry;
   // vm->strings is a hashmap of {ObjString*, FALSE_VAL}, basically a set
-  for (int i = 0; i < vm->strings.capacity; i++) {
-    entry = &vm->strings.entries[i];
+  for (int i = 0; i < map->capacity; i++) {
+    entry = &map->entries[i];
     // all unmarked strings are whites (unreachable), so remove them.
     if (IS_OBJ(entry->key) && !AS_OBJ(entry->key)->marked) {
 #ifdef EVE_DEBUG_GC
       printf("  [*] removing map weak-ref %p\n", AS_OBJ(entry->key));
 #endif
-      hashmap_remove(&vm->strings, entry->key);
+      hashmap_remove(map, entry->key);
     }
   }
 }
@@ -143,7 +144,9 @@ void mark_roots(VM* vm) {
     mark_object(vm, &vm->frames[i].closure->obj);
   }
   // mark globals roots
-  mark_hashmap(vm, &vm->globals);
+  mark_hashmap(vm, &vm->fp->closure->func->module->fields);
+  // mark modules roots
+  mark_hashmap(vm, &vm->modules);
   // mark compiler roots
   mark_compiler(vm);
 #if defined(EVE_DEBUG_GC)
@@ -177,6 +180,7 @@ void blacken_object(VM* vm, Obj* obj) {
       if (fn->name) {
         mark_object(vm, &fn->name->obj);
       }
+      mark_object(vm, &fn->module->obj);
       return;
     }
     case OBJ_CLOSURE: {
@@ -191,6 +195,7 @@ void blacken_object(VM* vm, Obj* obj) {
       mark_value(vm, ((ObjUpvalue*)obj)->value);
       return;
     }
+    case OBJ_MODULE:
     case OBJ_STRUCT: {
       ObjStruct* strukt = (ObjStruct*)obj;
       mark_hashmap(vm, &strukt->fields);
@@ -257,7 +262,7 @@ void collect(VM* vm) {
   // trace-references
   trace_references(vm);
   // remove weak-refs
-  remove_whites(vm);
+  remove_whites(&vm->strings);
   // sweep
   sweep(vm);
   vm->gc.next_collection = vm->gc.bytes_allocated * GC_HEAP_GROWTH_FACTOR;

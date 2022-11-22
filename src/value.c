@@ -69,6 +69,8 @@ char* get_object_type(Obj* obj) {
       return "instance";
     case OBJ_UPVALUE:
       return "upvalue";
+    case OBJ_MODULE:
+      return "module";
   }
   UNREACHABLE("unknown object type");
 }
@@ -174,6 +176,10 @@ void print_object(Value val, Obj* obj) {
       printf("{struct %s}", AS_STRUCT(val)->name->str);
       return;
     }
+    case OBJ_MODULE: {
+      printf("{module %s}", AS_STRUCT(val)->name->str);
+      return;
+    }
     case OBJ_INSTANCE: {
       printf("{instanceof %s}", AS_INSTANCE(val)->strukt->name->str);
       return;
@@ -235,11 +241,16 @@ Value object_to_string(VM* vm, Value val) {
       len = snprintf(buff, len, "@fn[%s]", get_func_name(fn));
       return (create_string(vm, &vm->strings, buff, len, false));
     }
+    case OBJ_MODULE:
     case OBJ_STRUCT: {
       ObjString* name = AS_STRUCT(val)->name;
       int len = 10 + name->length;
       char buff[len];
-      len = snprintf(buff, len, "@struct[%s]", name->str);
+      len = snprintf(
+          buff,
+          len,
+          AS_OBJ(val)->type == OBJ_STRUCT ? "@struct[%s]" : "@module[%s]",
+          name->str);
       return (create_string(vm, &vm->strings, buff, len, false));
     }
     case OBJ_INSTANCE: {
@@ -369,6 +380,7 @@ ObjFn* create_function(VM* vm) {
   fn->arity = 0;
   fn->env_len = 0;
   fn->name = NULL;
+  fn->module = NULL;
   return fn;
 }
 
@@ -400,6 +412,12 @@ ObjStruct* create_struct(VM* vm, ObjString* name) {
   hashmap_init(&strukt->fields);
   strukt->name = name;
   return strukt;
+}
+
+ObjStruct* create_module(VM* vm, ObjString* name) {
+  ObjStruct* mod = create_struct(vm, name);
+  mod->obj.type = OBJ_MODULE;
+  return mod;
 }
 
 ObjInstance* create_instance(VM* vm, ObjStruct* strukt) {
@@ -446,6 +464,7 @@ static uint32_t hash_object(Obj* obj) {
       return fn->name->hash ^ hash_bits(fn->arity)
           ^ hash_bits(fn->code.length);
     }
+    case OBJ_MODULE:
     case OBJ_STRUCT: {
       ObjStruct* strukt = ((ObjStruct*)obj);
       return strukt->name->hash ^ hash_bits(strukt->fields.length);

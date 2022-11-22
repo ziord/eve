@@ -89,6 +89,7 @@ typedef enum {
   OBJ_UPVALUE,
   OBJ_STRUCT,
   OBJ_INSTANCE,
+  OBJ_MODULE,
 } ObjTy;
 
 typedef struct Obj {
@@ -123,10 +124,17 @@ typedef struct {
 
 typedef struct {
   Obj obj;
+  ObjHashMap fields;
+  ObjString* name;
+} ObjStruct;
+
+typedef struct {
+  Obj obj;
   int arity;
   int env_len;
   Code code;
   ObjString* name;
+  ObjStruct* module;
 } ObjFn;
 
 typedef struct ObjUpvalue {
@@ -144,12 +152,6 @@ typedef struct {
   ObjFn* func;
   Env env;
 } ObjClosure;
-
-typedef struct {
-  Obj obj;
-  ObjHashMap fields;
-  ObjString* name;
-} ObjStruct;
 
 typedef struct {
   Obj obj;
@@ -196,6 +198,7 @@ ObjClosure* create_closure(VM* vm, ObjFn* func);
 ObjUpvalue* create_upvalue(VM* vm, Value*);
 ObjStruct* create_struct(VM* vm, ObjString* name);
 ObjInstance* create_instance(VM* vm, ObjStruct* strukt);
+ObjStruct* create_module(VM* vm, ObjString* name);
 char* get_func_name(ObjFn* fn);
 void hashmap_init(ObjHashMap* table);
 bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);

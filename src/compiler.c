@@ -41,7 +41,12 @@ void c_control(
     int continue_exit,
     int break_exit);
 
-void new_compiler(Compiler* compiler, AstNode* node, ObjFn* func, VM* vm) {
+void new_compiler(
+    Compiler* compiler,
+    AstNode* node,
+    ObjFn* func,
+    VM* vm,
+    char* fpath) {
   *compiler = (Compiler) {
       .root = node,
       .func = func,
@@ -53,6 +58,12 @@ void new_compiler(Compiler* compiler, AstNode* node, ObjFn* func, VM* vm) {
       .errors = 0,
       .current_loop = {.scope = 0},
       .enclosing = NULL};
+  if (fpath) {
+    Value name =
+        create_string(vm, &vm->strings, fpath, (int)strlen(fpath), false);
+    compiler->module = create_module(vm, AS_STRING(name));
+    compiler->func->module = compiler->module;
+  }
   vm->compiler = compiler;
   reserve_local(compiler);
 }
@@ -611,7 +622,8 @@ void c_function(Compiler* compiler, AstNode* node) {
     }
   }
   Compiler func_compiler;
-  new_compiler(&func_compiler, node, fn_obj, compiler->vm);
+  new_compiler(&func_compiler, node, fn_obj, compiler->vm, NULL);
+  fn_obj->module = func_compiler.module = compiler->module;  // set module
   func_compiler.enclosing = compiler;
   // compile params
   func_compiler.scope++;  // make params local to the function

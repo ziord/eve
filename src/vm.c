@@ -105,14 +105,14 @@ VM new_vm() {
       .compiler = NULL};
   vm.sp = vm.stack;
   hashmap_init(&vm.strings);
-  hashmap_init(&vm.globals);
+  hashmap_init(&vm.modules);
   gc_init(&vm.gc);
   return vm;
 }
 
 void free_vm(VM* vm) {
-  if (vm->globals.entries) {
-    FREE_BUFFER(vm, vm->globals.entries, HashEntry, vm->globals.capacity);
+  if (vm->modules.entries) {
+    FREE_BUFFER(vm, vm->modules.entries, HashEntry, vm->modules.capacity);
   }
   if (vm->strings.entries) {
     FREE_BUFFER(vm, vm->strings.entries, HashEntry, vm->strings.capacity);
@@ -129,8 +129,9 @@ void boot_vm(VM* vm, ObjFn* func) {
   vm->fp = vm->frames;
   vm->sp = vm->stack;
   // assumes that 'strings' hashmap has been initialized already by the compiler
-  hashmap_init(&vm->globals);
+  hashmap_init(&vm->modules);
   ObjClosure* closure = create_closure(vm, func);
+  ASSERT(closure->func->module, "top-level script must have a module");
   CallFrame frame = {
       .ip = func->code.bytes,
       .closure = closure,
@@ -389,14 +390,19 @@ IResult run(VM* vm) {
       }
       case $DEFINE_GLOBAL: {
         Value var = READ_CONST(vm);
-        hashmap_put(&vm->globals, vm, var, PEEK_STACK(vm));
+        hashmap_put(
+            &vm->fp->closure->func->module->fields,
+            vm,
+            var,
+            PEEK_STACK(vm));
         pop_stack(vm);
         continue;
       }
       case $GET_GLOBAL: {
         Value var = READ_CONST(vm);
         Value val;
-        if ((val = hashmap_get(&vm->globals, var)) != NOTHING_VAL) {
+        if ((val = hashmap_get(&vm->fp->closure->func->module->fields, var))
+            != NOTHING_VAL) {
           push_stack(vm, val);
         } else {
           return runtime_error(
@@ -416,10 +422,14 @@ IResult run(VM* vm) {
       }
       case $SET_GLOBAL: {
         Value var = READ_CONST(vm);
-        if (hashmap_put(&vm->globals, vm, var, PEEK_STACK(vm))) {
+        if (hashmap_put(
+                &vm->fp->closure->func->module->fields,
+                vm,
+                var,
+                PEEK_STACK(vm))) {
           // true if key is new - new insertion, false if key already exists
           ObjString* str = AS_STRING(value_to_string(vm, var));
-          hashmap_remove(&vm->globals, var);
+          hashmap_remove(&vm->fp->closure->func->module->fields, var);
           return runtime_error(
               vm,
               "use of undefined variable '%s'",

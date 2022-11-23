@@ -39,3 +39,17 @@ assert y.pin.pin == 10;
 let dict = #{y.pin: Bar};
 assert dict[y.pin] == Bar;
 assert dict[y.pin]::pi == 22/7;
+
+struct Test {
+    @compose a, b, c;
+}
+
+let instance = Test {a = 5};
+instance.b = 10;
+instance.c = instance.a ** instance.b;
+assert instance.a == 5 && instance.b == 10 && instance.c == 9765625;
+
+let instance = Test {};
+assert instance.a == None;
+assert instance.b == None;
+assert instance.c == None;

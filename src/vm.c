@@ -582,12 +582,18 @@ IResult run(VM* vm) {
                   vm,
                   property,
                   PEEK_STACK_AT(vm, 1))) {
-            hashmap_remove(&instance->fields, property);
-            return runtime_error(
-                vm,
-                "Instance of %s has no property '%s'",
-                instance->strukt->name->str,
-                AS_STRING(property)->str);
+            // check if the key exists in the instance's struct and its value is a NOTHING_VAL
+            // this means instance was created with some of its fields unassigned.
+            Value val;
+            if (!(hashmap_has_key(&instance->strukt->fields, property, &val)
+                  && val == NOTHING_VAL)) {
+              hashmap_remove(&instance->fields, property);
+              return runtime_error(
+                  vm,
+                  "Instance of '%s' has no property '%s'",
+                  instance->strukt->name->str,
+                  AS_STRING(property)->str);
+            }
           }
           pop_stack(vm);
         } else {

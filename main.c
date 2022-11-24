@@ -4,19 +4,20 @@
 #include "src/debug.h"
 #include "src/vm.h"
 
-void cleanup(Parser* parser, char* src) {
-  free_parser(parser);
-  free(src);
-}
-
 int execute(char* fp) {
   VM vm = new_vm();
   // parse
-  char* src = read_file(fp);
+  char* src = NULL;
+  char* msg = read_file(fp, &src);
+  if (msg != NULL) {
+    fprintf(stderr, "%s\n", msg);
+    src ? free(src) : (void)0;
+    return RESULT_COMPILE_ERROR;
+  }
   Parser parser = new_parser(src, fp);
   AstNode* root = parse(&parser);
   if (parser.errors) {
-    cleanup(&parser, src);
+    cleanup_parser(&parser, src);
     return RESULT_COMPILE_ERROR;
   }
   // compile
@@ -25,7 +26,7 @@ int execute(char* fp) {
   new_compiler(&compiler, root, func, &vm, fp);
   compile(&compiler);
   if (compiler.errors) {
-    cleanup(&parser, src);
+    cleanup_parser(&parser, src);
     return RESULT_COMPILE_ERROR;
   }
   free_parser(&parser);

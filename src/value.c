@@ -71,6 +71,8 @@ char* get_object_type(Obj* obj) {
       return "upvalue";
     case OBJ_MODULE:
       return "module";
+    case OBJ_CFN:
+      return "builtin_function";
   }
   UNREACHABLE("unknown object type");
 }
@@ -184,6 +186,10 @@ void print_object(Value val, Obj* obj) {
       printf("{instanceof %s}", AS_INSTANCE(val)->strukt->name->str);
       return;
     }
+    case OBJ_CFN: {
+      printf("{builtin_fn %s}", AS_CFUNC(val)->name);
+      return;
+    }
   }
   UNREACHABLE("print: unknown object type");
 }
@@ -258,6 +264,13 @@ Value object_to_string(VM* vm, Value val) {
       int len = 12 + name->length;
       char buff[len];
       len = snprintf(buff, len, "@instance[%s]", name->str);
+      return (create_string(vm, &vm->strings, buff, len, false));
+    }
+    case OBJ_CFN: {
+      const char* name = AS_CFUNC(val)->name;
+      int len = (int)strlen(name) + 14;
+      char buff[len];
+      len = snprintf(buff, len, "@builtin_fn[%s]", name);
       return (create_string(vm, &vm->strings, buff, len, false));
     }
     case OBJ_FN:
@@ -428,6 +441,14 @@ ObjInstance* create_instance(VM* vm, ObjStruct* strukt) {
   return instance;
 }
 
+ObjCFn* create_cfn(VM* vm, CFn fn, int arity, const char* name) {
+  ObjCFn* func = CREATE_OBJ(vm, ObjCFn, OBJ_CFN, sizeof(ObjCFn));
+  func->fn = fn;
+  func->arity = arity;
+  func->name = name;
+  return func;
+}
+
 inline char* get_func_name(ObjFn* fn) {
   return fn->name ? fn->name->str : "<anonymous>";
 }
@@ -463,6 +484,11 @@ static uint32_t hash_object(Obj* obj) {
       ObjFn* fn = ((ObjClosure*)obj)->func;
       return fn->name->hash ^ hash_bits(fn->arity)
           ^ hash_bits(fn->code.length);
+    }
+    case OBJ_CFN: {
+      ObjCFn* fn = (ObjCFn*)obj;
+      int len = (int)strlen(fn->name);
+      return hash_string(fn->name, len) ^ hash_bits(fn->arity);
     }
     case OBJ_MODULE:
     case OBJ_STRUCT: {

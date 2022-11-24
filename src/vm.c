@@ -1,5 +1,7 @@
 #include "vm.h"
 
+#include "core.h"
+
 #define READ_BYTE(vm) (*(vm->fp->ip++))
 #define READ_SHORT(vm) \
   (vm->fp->ip += 2, ((vm->fp->ip[-2]) << 8u) | (vm->fp->ip[-1]))
@@ -43,7 +45,6 @@
         get_value_type((_a))); \
   }
 
-static IResult runtime_error(VM* vm, char* fmt, ...);
 inline static void close_upvalues(VM* vm, const Value* slot);
 
 inline static Value pop_stack(VM* vm) {
@@ -70,6 +71,8 @@ inline static bool push_frame(VM* vm, CallFrame frame) {
   }
   vm->fp = &vm->frames[vm->frame_count++];
   *vm->fp = frame;
+  // set the current module
+  vm->current_module = vm->fp->closure->func->module;
   return true;
 }
 
@@ -80,8 +83,14 @@ inline static CallFrame pop_frame(VM* vm) {
   if (vm->frame_count > 0) {
     // set current frame
     vm->fp = &vm->frames[vm->frame_count - 1];
+    // set the current module
+    vm->current_module = vm->fp->closure->func->module;
   }
   return frame;
+}
+
+bool vm_push_frame(VM* vm, CallFrame frame) {
+  return push_frame(vm, frame);
 }
 
 inline static void print_stack(VM* vm) {
@@ -102,7 +111,9 @@ VM new_vm() {
       .frame_count = 0,
       .is_compiling = true,
       .upvalues = NULL,
-      .compiler = NULL};
+      .compiler = NULL,
+      .builtins = NULL,
+      .current_module = NULL};
   vm.sp = vm.stack;
   hashmap_init(&vm.strings);
   hashmap_init(&vm.modules);
@@ -138,10 +149,13 @@ void boot_vm(VM* vm, ObjFn* func) {
       .stack = vm->sp};
   push_frame(vm, frame);
   push_stack(vm, OBJ_VAL(closure));
+  init_builtins(vm);
+  init_module(vm, closure->func->module);
   vm->is_compiling = false;
 }
 
-static IResult runtime_error(VM* vm, char* fmt, ...) {
+IResult runtime_error(VM* vm, char* fmt, ...) {
+  vm->has_error = true;
   va_list ap;
   fputs("Runtime Error: ", stderr);
   va_start(ap, fmt);
@@ -228,18 +242,40 @@ static bool perform_subscript(VM* vm, Value val, Value subscript) {
   return false;
 }
 
-static bool perform_prop_access(VM* vm, Value value, Value property) {
+static bool struct_prop_access(VM* vm, Value value, Value property) {
   ObjString* prop = AS_STRING(property);
-  if (IS_STRUCT(value)) {
+  if (IS_STRUCT(value) || IS_MODULE(value)) {
     ObjStruct* strukt = AS_STRUCT(value);
     Value res;
     if ((res = hashmap_get(&strukt->fields, property)) != NOTHING_VAL) {
       push_stack(vm, res);
       return true;
     } else {
-      runtime_error(vm, "Illegal/unknown property access '%s'", prop->str);
+      if (IS_STRUCT(value)) {
+        runtime_error(
+            vm,
+            "Illegal/unknown property access '%s'",
+            prop->str);
+      } else {
+        runtime_error(
+            vm,
+            "Module '%s' has no property '%s'",
+            strukt->name->str,
+            prop->str);
+      }
     }
-  } else if (IS_INSTANCE(value)) {
+  } else {
+    return runtime_error(
+        vm,
+        "Invalid field accessor for type '%s'",
+        get_value_type(value),
+        prop->str);
+  }
+  return false;
+}
+
+static bool instance_prop_access(VM* vm, Value value, Value property) {
+  if (IS_INSTANCE(value)) {
     ObjInstance* instance = AS_INSTANCE(value);
     Value res;
     if ((res = hashmap_get(&instance->fields, property)) != NOTHING_VAL) {
@@ -265,13 +301,16 @@ static bool perform_prop_access(VM* vm, Value value, Value property) {
         return true;
       }
     }
-    runtime_error(vm, "Illegal/unknown property access '%s'", prop->str);
+    runtime_error(
+        vm,
+        "Illegal/unknown property access '%s'",
+        AS_STRING(property)->str);
   } else {
     runtime_error(
         vm,
-        "'%s' type has no property '%s'",
+        "Invalid property accessor for type '%s'",
         get_value_type(value),
-        prop->str);
+        AS_STRING(property)->str);
   }
   return false;
 }
@@ -328,6 +367,20 @@ inline static bool call_value(VM* vm, Value val, int argc, bool is_tco) {
         vm,
         "'%s' function takes %d argument(s) but got %d",
         get_func_name(fn),
+        fn->arity,
+        argc);
+  } else if (IS_CFUNC(val)) {
+    ObjCFn* fn = AS_CFUNC(val);
+    if (fn->arity == argc || fn->arity < 0) {
+      Value res = fn->fn(vm, argc, vm->sp - argc);
+      vm->sp -= (argc + 1);
+      push_stack(vm, res);
+      return !vm->has_error;
+    }
+    runtime_error(
+        vm,
+        "'%s' function takes %d argument(s) but got %d",
+        fn->name,
         fn->arity,
         argc);
   } else {
@@ -390,18 +443,14 @@ IResult run(VM* vm) {
       }
       case $DEFINE_GLOBAL: {
         Value var = READ_CONST(vm);
-        hashmap_put(
-            &vm->fp->closure->func->module->fields,
-            vm,
-            var,
-            PEEK_STACK(vm));
+        hashmap_put(&vm->current_module->fields, vm, var, PEEK_STACK(vm));
         pop_stack(vm);
         continue;
       }
       case $GET_GLOBAL: {
         Value var = READ_CONST(vm);
         Value val;
-        if ((val = hashmap_get(&vm->fp->closure->func->module->fields, var))
+        if ((val = hashmap_get(&vm->current_module->fields, var))
             != NOTHING_VAL) {
           push_stack(vm, val);
         } else {
@@ -423,13 +472,13 @@ IResult run(VM* vm) {
       case $SET_GLOBAL: {
         Value var = READ_CONST(vm);
         if (hashmap_put(
-                &vm->fp->closure->func->module->fields,
+                &vm->current_module->fields,
                 vm,
                 var,
                 PEEK_STACK(vm))) {
           // true if key is new - new insertion, false if key already exists
           ObjString* str = AS_STRING(value_to_string(vm, var));
-          hashmap_remove(&vm->fp->closure->func->module->fields, var);
+          hashmap_remove(&vm->current_module->fields, var);
           return runtime_error(
               vm,
               "use of undefined variable '%s'",
@@ -573,10 +622,18 @@ IResult run(VM* vm) {
         }
         continue;
       }
+      case $GET_FIELD: {
+        Value property = READ_CONST(vm);
+        Value value = pop_stack(vm);
+        if (!struct_prop_access(vm, value, property)) {
+          return RESULT_RUNTIME_ERROR;
+        }
+        continue;
+      }
       case $GET_PROPERTY: {
         Value property = READ_CONST(vm);
         Value value = pop_stack(vm);
-        if (!perform_prop_access(vm, value, property)) {
+        if (!instance_prop_access(vm, value, property)) {
           return RESULT_RUNTIME_ERROR;
         }
         continue;

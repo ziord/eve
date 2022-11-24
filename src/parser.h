@@ -21,5 +21,6 @@ typedef struct {
 Parser new_parser(char* src, const char* fp);
 void free_parser(Parser* parser);
 AstNode* parse(Parser* parser);
+void cleanup_parser(Parser* parser, char* src);
 
 #endif  //EVE_PARSER_H

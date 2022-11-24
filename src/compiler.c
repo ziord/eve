@@ -46,7 +46,7 @@ void new_compiler(
     AstNode* node,
     ObjFn* func,
     VM* vm,
-    char* fpath) {
+    char* module_name) {
   *compiler = (Compiler) {
       .root = node,
       .func = func,
@@ -58,13 +58,19 @@ void new_compiler(
       .errors = 0,
       .current_loop = {.scope = 0},
       .enclosing = NULL};
-  if (fpath) {
-    Value name =
-        create_string(vm, &vm->strings, fpath, (int)strlen(fpath), false);
+  if (module_name) {
+    Value name = create_string(
+        vm,
+        &vm->strings,
+        module_name,
+        (int)strlen(module_name),
+        false);
     compiler->module = create_module(vm, AS_STRING(name));
     compiler->func->module = compiler->module;
   }
-  vm->compiler = compiler;
+  if (!vm->compiler) {
+    vm->compiler = compiler;
+  }
   reserve_local(compiler);
 }
 
@@ -308,7 +314,10 @@ void c_dcol_dot(Compiler* compiler, BinaryNode* node) {
   // compiles expr::var (struct property access) or
   // expr.var (instance property access) i.e. OP_DCOL | OP_DOT
   c_(compiler, node->l_node);
-  load_variable(compiler, &node->r_node->var, $GET_PROPERTY);
+  load_variable(
+      compiler,
+      &node->r_node->var,
+      node->op == OP_DOT ? $GET_PROPERTY : $GET_FIELD);
 }
 
 void c_binary(Compiler* compiler, AstNode* node) {
@@ -648,9 +657,6 @@ void c_function(Compiler* compiler, AstNode* node) {
     emit_byte(compiler, $DEFINE_GLOBAL, func->line);
     emit_byte(compiler, name_slot, func->line);
   }
-  // new_compiler() called above resets vm->compiler to func_compiler,
-  // so we reset it here.
-  compiler->vm->compiler = compiler;
 #ifdef EVE_DEBUG
   if (!func_compiler.errors) {
     dis_code(&fn_obj->code, get_func_name(fn_obj));

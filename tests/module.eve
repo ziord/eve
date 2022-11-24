@@ -1,0 +1,41 @@
+struct Node {
+    @compose: next, value;
+}
+
+struct List {
+    @compose: head, length, append, print;
+    @declare: new => fn () {
+        let list = List {head = None, length = 0 };
+        fn append(val) {
+            if list.head == None {
+                list.head = Node { value = val, next = None };
+            } else {
+                let prev = None;
+                let curr = list.head;
+                while curr != None {
+                    prev = curr;
+                    curr = curr.next;
+                }
+                prev.next = Node { value = val, next = None };
+            }
+            list.length += 1;
+        }
+
+        fn print() {
+            core::print("[");
+            let curr = list.head;
+            while curr != None {
+                core::print(curr.value);
+                if curr.next {
+                    core::print(",");
+                }
+                curr = curr.next;
+            }
+            core::println("]");
+        }
+        list.append = append;
+        ##list.length = length;
+        list.print = print;
+        return list;
+    };
+}

@@ -16,6 +16,6 @@
 _Noreturn void error(char* fmt, ...);
 int copy_str(const char* src, char** dest, int len);
 int copy_str_compact(VM* vm, const char* src, char** dest, int len);
-char* read_file(const char* fn);
+char* read_file(const char* fn, char** buff);
 
 #endif  //EVE_UTIL_H

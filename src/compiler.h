@@ -46,7 +46,7 @@ void new_compiler(
     AstNode* node,
     ObjFn* func,
     VM* vm,
-    char* fpath);
+    char* module_name);
 void compile(Compiler* compiler);
 
 #endif  //EVE_COMPILER_H

@@ -1,7 +1,5 @@
 #include "util.h"
 
-#include <errno.h>
-
 _Noreturn void error(char* fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -64,26 +62,26 @@ int copy_str_compact(VM* vm, const char* src, char** dest, int len) {
   return real_len;
 }
 
-char* read_file(const char* fn) {
+char* read_file(const char* fn, char** buff) {
   if (!fn) {
-    error("No filename specified");
+    return "No filename specified";
   }
   FILE* file = fopen(fn, "r");
   if (!file) {
-    error("Could not open file '%s' <errno: %d>", fn, errno);
+    return "Could not open file";
   }
   fseek(file, 0L, SEEK_END);
   size_t size = ftell(file);
   rewind(file);
-  char* tmp = alloc(NULL, size + 1);
-  if (fread(tmp, sizeof(char), size, file) < size) {
+  *buff = alloc(NULL, size + 1);
+  if (fread(*buff, sizeof(char), size, file) < size) {
     if (ferror(file)) {
       clearerr(file);
     }
     fclose(file);
-    error("Could not read file '%s' <errno: %d>", fn, errno);
+    return "Could not read file";
   }
-  tmp[size] = '\0';
+  (*buff)[size] = '\0';
   fclose(file);
-  return tmp;
+  return NULL;
 }

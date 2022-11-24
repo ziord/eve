@@ -164,6 +164,8 @@ int dis_instruction(Code* code, int index) {
       return constant_instruction("$SET_GLOBAL", code, index);
     case $GET_PROPERTY:
       return constant_instruction("$GET_PROPERTY", code, index);
+    case $GET_FIELD:
+      return constant_instruction("$GET_FIELD", code, index);
     case $BUILD_STRUCT:
       return struct_instruction("$BUILD_STRUCT", code, index);
     case $BUILD_CLOSURE:

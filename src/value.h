@@ -48,6 +48,8 @@ typedef uint64_t Value;
 #define IS_CLOSURE(val) (is_object_type(val, OBJ_CLOSURE))
 #define IS_STRUCT(val) (is_object_type(val, OBJ_STRUCT))
 #define IS_INSTANCE(val) (is_object_type(val, OBJ_INSTANCE))
+#define IS_CFUNC(val) (is_object_type(val, OBJ_CFN))
+#define IS_MODULE(val) (is_object_type(val, OBJ_MODULE))
 
 #define AS_STRING(val) ((ObjString*)(AS_OBJ(val)))
 #define AS_LIST(val) ((ObjList*)(AS_OBJ(val)))
@@ -56,6 +58,8 @@ typedef uint64_t Value;
 #define AS_CLOSURE(val) ((ObjClosure*)(AS_OBJ(val)))
 #define AS_STRUCT(val) ((ObjStruct*)(AS_OBJ(val)))
 #define AS_INSTANCE(val) ((ObjInstance*)(AS_OBJ(val)))
+#define AS_CFUNC(val) ((ObjCFn*)(AS_OBJ(val)))
+#define AS_MODULE(val) AS_STRUCT(val)
 
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
@@ -90,6 +94,7 @@ typedef enum {
   OBJ_STRUCT,
   OBJ_INSTANCE,
   OBJ_MODULE,
+  OBJ_CFN,
 } ObjTy;
 
 typedef struct Obj {
@@ -136,6 +141,15 @@ typedef struct {
   ObjString* name;
   ObjStruct* module;
 } ObjFn;
+
+typedef Value (*CFn)(VM* vm, int argc, const Value* args);
+
+typedef struct {
+  Obj obj;
+  int arity;
+  CFn fn;
+  const char* name;
+} ObjCFn;
 
 typedef struct ObjUpvalue {
   Obj obj;
@@ -198,6 +212,7 @@ ObjClosure* create_closure(VM* vm, ObjFn* func);
 ObjUpvalue* create_upvalue(VM* vm, Value*);
 ObjStruct* create_struct(VM* vm, ObjString* name);
 ObjInstance* create_instance(VM* vm, ObjStruct* strukt);
+ObjCFn* create_cfn(VM* vm, CFn fn, int arity, const char* name);
 ObjStruct* create_module(VM* vm, ObjString* name);
 char* get_func_name(ObjFn* fn);
 void hashmap_init(ObjHashMap* table);

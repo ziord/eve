@@ -70,6 +70,9 @@ void free_object(VM* vm, Obj* obj) {
       FREE(vm, obj, ObjInstance);
       break;
     }
+    case OBJ_CFN:
+      FREE(vm, obj, ObjCFn);
+      break;
   }
 }
 
@@ -81,7 +84,9 @@ void remove_whites(ObjHashMap* map) {
     // all unmarked strings are whites (unreachable), so remove them.
     if (IS_OBJ(entry->key) && !AS_OBJ(entry->key)->marked) {
 #ifdef EVE_DEBUG_GC
-      printf("  [*] removing map weak-ref %p\n", AS_OBJ(entry->key));
+      printf("  [*] removing map weak-ref %p (", AS_OBJ(entry->key));
+      print_value(entry->key);
+      printf(")\n");
 #endif
       hashmap_remove(map, entry->key);
     }
@@ -143,10 +148,10 @@ void mark_roots(VM* vm) {
   for (int i = 0; i < vm->frame_count; i++) {
     mark_object(vm, &vm->frames[i].closure->obj);
   }
-  // mark globals roots
-  mark_hashmap(vm, &vm->fp->closure->func->module->fields);
   // mark modules roots
   mark_hashmap(vm, &vm->modules);
+  // mark builtins roots
+  mark_object(vm, &vm->builtins->obj);
   // mark compiler roots
   mark_compiler(vm);
 #if defined(EVE_DEBUG_GC)
@@ -208,6 +213,7 @@ void blacken_object(VM* vm, Obj* obj) {
       mark_object(vm, &instance->strukt->obj);
       return;
     }
+    case OBJ_CFN:
     case OBJ_STR:
       return;
   }

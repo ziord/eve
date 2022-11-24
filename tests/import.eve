@@ -1,0 +1,19 @@
+let EXPORT = "fantastic";
+let mod = core::import("module.eve");
+assert mod;
+let list = mod::List::new();
+assert list.length == 0;
+list.append(1);
+list.append(2);
+list.append(3);
+list.print();
+assert list.length == 3;
+
+let mod = core::import("program.eve");
+assert mod;
+core::print(mod);
+core::print(mod::Data, mod::Data, mod::d);
+let mod2 = core::import("core-1.eve");
+core::println(mod2);
+let mod3 = core::import("core-1.eve");
+assert mod2 == mod3;

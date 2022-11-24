@@ -1124,4 +1124,9 @@ AstNode* parse(Parser* parser) {
   return node;
 }
 
+void cleanup_parser(Parser* parser, char* src) {
+  free_parser(parser);
+  free(src);
+}
+
 #undef CREATE_BUFFER

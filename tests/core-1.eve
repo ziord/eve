@@ -1,0 +1,63 @@
+#** core general **#
+let x = "foobar";
+fn bar() {}
+## core
+assert core;
+
+## print
+assert core::print;
+core::print(core);
+assert core::print() == None;
+assert core::print(x, x, 5, 10) == None;
+assert core::print(10, 0xff, #{x: x}) == None;
+
+## println
+assert core::println;
+assert core::println([x, x], None) == None;
+assert core::println() == None;
+
+## type
+assert core::type;
+assert core::type("") == "string";
+assert core::type(x) == "string";
+assert core::type("may-day") == "string";
+assert core::type(#{}) == "hashmap";
+assert core::type(#{x: x}) == "hashmap";
+assert core::type([]) == "list";
+assert core::type([1, ["ox"], #{x: x}]) == "list";
+assert core::type(2.45) == "number";
+assert core::type(245e0) == "number";
+assert core::type(-2450) == "number";
+assert core::type(true) == "bool";
+assert core::type(false) == "bool";
+assert core::type(None) == "None";
+assert core::type(core) == "module";
+assert core::type(core::list) == "module";
+assert core::type(core::string) == "module";
+assert core::type(fn(){}) == "function";
+assert core::type(bar) == "function";
+assert core::type(core::print) == "builtin_function";
+assert core::type(core::type) == "builtin_function";
+
+## import
+assert core::import;
+let mod = core::import("module.eve");
+assert mod;
+assert core::type(mod) == "module";
+assert core::type(mod::Node) == "struct";
+assert core::type(mod::List) == "struct";
+let type = core::type;
+assert type(0xf) == "number";
+
+## exit
+assert core::exit;
+
+## time
+assert core::time;
+assert core::type(core::time()) == "number";
+assert core::time() > 1669268746.435078;
+
+## clock
+assert core::clock;
+assert core::type(core::clock()) == "number";
+assert core::clock() > 1e-5;

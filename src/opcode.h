@@ -42,8 +42,9 @@ typedef enum {
   $POP_N,
   $DISPLAY,
   $SUBSCRIPT,
-  $GET_PROPERTY,
-  $SET_PROPERTY,
+  $GET_FIELD,  // struct/module
+  $GET_PROPERTY,  // instance
+  $SET_PROPERTY,  // instance
   $SET_SUBSCRIPT,
   $DEFINE_GLOBAL,
   $GET_GLOBAL,

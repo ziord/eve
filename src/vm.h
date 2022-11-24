@@ -24,6 +24,7 @@ typedef struct {
 
 typedef struct VM {
   bool is_compiling;
+  bool has_error;
   int frame_count;
   ObjHashMap strings;
   ObjHashMap modules;
@@ -35,13 +36,17 @@ typedef struct VM {
   ObjUpvalue* upvalues;
   Obj* objects;
   struct Compiler* compiler;
+  ObjStruct* builtins;
+  ObjStruct* current_module;
 } VM;
 
 Value vm_pop_stack(VM* vm);
 void vm_push_stack(VM* vm, Value val);
+bool vm_push_frame(VM* vm, CallFrame frame);
 VM new_vm();
 void free_vm(VM* vm);
 void boot_vm(VM* vm, ObjFn* func);
+IResult runtime_error(VM* vm, char* fmt, ...);
 IResult run(VM* vm);
 
 #endif  //EVE_VM_H

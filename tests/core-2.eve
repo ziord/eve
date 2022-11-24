@@ -1,0 +1,18 @@
+let x = "foobar";
+
+#** core string **#
+assert core::string;
+assert core::string::len("the perks of being a wallflower") == 31;
+assert core::string::len("") == 0;
+assert core::string::len(x) == 6;
+
+#** core list **#
+assert core::list;
+assert core::list::len([2, 3, 4, 5, 6]) == 5;
+assert core::list::len([]) == 0;
+
+#** core hashmap **#
+let x = #{};
+core::hashmap;
+core::hashmap::put(x, "fish", "this is it");
+assert x["fish"] == "this is it";

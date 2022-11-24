@@ -94,6 +94,7 @@ typedef enum {
   OBJ_STRUCT,
   OBJ_INSTANCE,
   OBJ_MODULE,
+  OBJ_CFN,
 } ObjTy;
 
 typedef struct Obj {
@@ -218,6 +219,7 @@ ObjClosure* create_closure(VM* vm, ObjFn* func);
 ObjUpvalue* create_upvalue(VM* vm, Value*);
 ObjStruct* create_struct(VM* vm, ObjString* name);
 ObjInstance* create_instance(VM* vm, ObjStruct* strukt);
+ObjCFn* create_cfn(VM* vm, CFn fn, int arity, const char* name);
 ObjStruct* create_module(VM* vm, ObjString* name);
 char* get_func_name(ObjFn* fn);
 void hashmap_init(ObjHashMap* table);

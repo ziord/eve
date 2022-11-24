@@ -148,10 +148,10 @@ void mark_roots(VM* vm) {
   for (int i = 0; i < vm->frame_count; i++) {
     mark_object(vm, &vm->frames[i].closure->obj);
   }
-  // mark globals roots
-  mark_hashmap(vm, &vm->fp->closure->func->module->fields);
   // mark modules roots
   mark_hashmap(vm, &vm->modules);
+  // mark builtins roots
+  mark_object(vm, &vm->builtins->obj);
   // mark compiler roots
   mark_compiler(vm);
 #if defined(EVE_DEBUG_GC)

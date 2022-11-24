@@ -612,18 +612,14 @@ IResult run(VM* vm) {
       }
       case $DEFINE_GLOBAL: {
         Value var = READ_CONST(vm);
-        hashmap_put(
-            &vm->fp->closure->func->module->fields,
-            vm,
-            var,
-            PEEK_STACK(vm));
+        hashmap_put(&vm->current_module->fields, vm, var, PEEK_STACK(vm));
         pop_stack(vm);
         continue;
       }
       case $GET_GLOBAL: {
         Value var = READ_CONST(vm);
         Value val;
-        if ((val = hashmap_get(&vm->fp->closure->func->module->fields, var))
+        if ((val = hashmap_get(&vm->current_module->fields, var))
             != NOTHING_VAL) {
           push_stack(vm, val);
         } else {
@@ -647,13 +643,13 @@ IResult run(VM* vm) {
       case $SET_GLOBAL: {
         Value var = READ_CONST(vm);
         if (hashmap_put(
-                &vm->fp->closure->func->module->fields,
+                &vm->current_module->fields,
                 vm,
                 var,
                 PEEK_STACK(vm))) {
           // true if key is new - new insertion, false if key already exists
           ObjString* str = AS_STRING(value_to_string(vm, var));
-          hashmap_remove(&vm->fp->closure->func->module->fields, var);
+          hashmap_remove(&vm->current_module->fields, var);
           return runtime_error(
               vm,
               NOTHING_VAL,

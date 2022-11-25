@@ -98,7 +98,7 @@ ExprParseTable p_table[] = {
   [TK_AMP] = {.bp = BP_BW_AND, .prefix = NULL, .infix = parse_binary},
   [TK_LSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
   [TK_RSHIFT] = {.bp = BP_SHIFT, .prefix = NULL, .infix = parse_binary},
-  [TK_ARROW] = {.bp = BP_SHIFT, .prefix = NULL, .infix = NULL},
+  [TK_ARROW] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_AT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_DOT] = {.bp = BP_ACCESS, .prefix = NULL, .infix = parse_dot_expr},
   [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},

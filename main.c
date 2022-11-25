@@ -7,7 +7,7 @@
   #include "src/debug.h"
 #endif
 
-int execute(char* fp) {
+int execute_eve(char* fp, const char* bin) {
   VM vm = new_vm();
   // parse
   char* src = NULL;
@@ -33,6 +33,12 @@ int execute(char* fp) {
     return RESULT_COMPILE_ERROR;
   }
   free_parser(&parser);
+  if (bin) {
+    EveSerde serde;
+    init_serde(&serde, SD_SERIALIZE, &vm, (error_cb)serde_error_cb);
+    serialize(&serde, bin, func);
+    free_serde(&serde);
+  }
   // run
   boot_vm(&vm, func);
   IResult ret = run(&vm);
@@ -96,7 +102,7 @@ int parse_args(int argc, char* argv[]) {
       }
     }
     default:
-      return execute(argv[1]);
+      return execute_eve(argv[1], NULL);
   }
 }
 

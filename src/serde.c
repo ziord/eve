@@ -218,7 +218,6 @@ Value de_struct(EveSerde* serde, ObjTy ty) {
                         : "Expected 'module' type"));
   ObjString* name = de_string(serde);
   ObjStruct* strukt = create_struct(serde->vm, name);
-  strukt->obj.type = ty;
   de_hashmap(serde);
   return OBJ_VAL(strukt);
 }
@@ -252,7 +251,6 @@ void ser_fn(EveSerde* serde, ObjFn* fn) {
   }
   ser_code(serde, &fn->code);
   if (i == 0) {
-    // $$SERDE_MODULE_HACK$$
     // we only need to ser this once, afterwards,
     // the others would be initialized through this.
     // this is an effective hack to ensure that all defined functions
@@ -333,13 +331,13 @@ Value de_object(EveSerde* serde) {
   return UNUSED(NOTHING_VAL);
 }
 
-bool serialize(EveSerde* serde, const char* filename, ObjFn* script) {
+bool serialize(EveSerde* serde, const char* fname, ObjFn* script) {
   ASSERT(serde->vm, "Expected serde initialized with VM");
   ASSERT(serde->callback, "Expected serde initialized with error callback");
   ASSERT(
       serde->mode == SD_SERIALIZE,
       "Expected serde initialized in 'serialize' mode");
-  FILE* file = open_file(filename, "wb");
+  FILE* file = open_file(fname, "wb");
   if (!file) {
     return false;
   }
@@ -351,13 +349,13 @@ bool serialize(EveSerde* serde, const char* filename, ObjFn* script) {
   return true;
 }
 
-ObjFn* deserialize(EveSerde* serde, const char* filename) {
+ObjFn* deserialize(EveSerde* serde, const char* fname) {
   ASSERT(serde->vm, "Expected serde initialized with VM");
   ASSERT(serde->callback, "Expected serde initialized with error callback");
   ASSERT(
       serde->mode == SD_DESERIALIZE,
       "Expected serde initialized in 'deserialize' mode");
-  FILE* file = open_file(filename, "rb");
+  FILE* file = open_file(fname, "rb");
   if (!file) {
     return false;
   }

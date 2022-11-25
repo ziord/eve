@@ -1,14 +1,18 @@
 #include "core.h"
 
 #include <limits.h>
+#include <sys/stat.h>
 #include <time.h>
 
 #include "compiler.h"
 #include "parser.h"
+#include "serde.h"
 #include "vm.h"
 
 #ifdef _WIN32
+  #include <direct.h>
   #define PATH_SEP '\\'
+  #define mkdir(dir, mode) _mkdir(dir)
 #else
   #define PATH_SEP '/'
 #endif
@@ -253,6 +257,11 @@ void init_module(VM* vm, ObjStruct* module) {
   vm_pop_stack(vm);
 }
 
+inline static bool file_exists(char* path) {
+  FILE* file = fopen(path, "r");
+  return file && !fclose(file);
+}
+
 #define ASSERT_TYPE(vm, check, val, ret, ...) \
   if (!check(val)) { \
     runtime_error(vm, __VA_ARGS__); \
@@ -309,6 +318,53 @@ Value fn_import(VM* vm, int argc, const Value* args) {
     runtime_error(vm, "Could not resolve path to module '%s'", fname->str);
     return module;
   }
+#ifdef EVE_OPTIMIZE_IMPORTS
+  char* filename = strrchr(path->str, PATH_SEP);
+  char dir_buff[PATH_MAX], eco_file[PATH_MAX];
+  if (filename) {
+    ++filename;
+    char* dir = path->str;
+    int dir_len = (int)(filename - path->str);
+    snprintf(dir_buff, PATH_MAX, "%.*s__eve__", dir_len, dir);
+    char* dot = strrchr(filename, '.');
+    ASSERT(dot, "module files should have an extension");
+    snprintf(
+        eco_file,
+        PATH_MAX,
+        "%s/%.*s.eve-%d%d%d.eco",
+        dir_buff,
+        (int)(dot - filename),
+        filename,
+        EVE_VERSION_MAJOR,
+        EVE_VERSION_MINOR,
+        EVE_VERSION_PATCH);
+    // only use .eco files when the .eve file is available
+    if (file_exists(eco_file) && file_exists(path->str)) {
+      ObjStruct* current_module = vm->current_module;
+      vm->current_module = NULL;  // see $$SERDE_MODULE_HACK$$ in serde.c
+      EveSerde serde;
+      init_serde(&serde, SD_DESERIALIZE, vm, (error_cb)serde_error_cb);
+      ObjFn* func = deserialize(&serde, eco_file);
+      free_serde(&serde);
+      if (func) {
+        ObjClosure* closure = create_closure(vm, func);
+        init_module(vm, func->module);
+        module = OBJ_VAL(func->module);
+        // cache the module
+        hashmap_put(&vm->modules, vm, value, module);
+        // push a new frame to execute the module
+        CallFrame frame = {
+            .closure = closure,
+            .stack = vm->sp - 1 - argc,
+            .ip = func->code.bytes};
+        vm_push_frame(vm, frame);
+        vm->is_compiling = false;
+        return module;
+      }
+      vm->current_module = current_module;
+    }
+  }
+#endif
   char* src = NULL;
   char* msg = read_file(path->str, &src);
   if (msg != NULL) {
@@ -327,7 +383,6 @@ Value fn_import(VM* vm, int argc, const Value* args) {
     Compiler compiler;
     ObjFn* func = create_function(vm);
     ObjClosure* closure = create_closure(vm, func);
-    // TODO: use resolved path or provided path from args?
     new_compiler(&compiler, root, func, vm, path->str);
     compile(&compiler);
     cleanup_parser(&parser, src);
@@ -343,6 +398,17 @@ Value fn_import(VM* vm, int argc, const Value* args) {
           .stack = vm->sp - 1 - argc,
           .ip = func->code.bytes};
       vm_push_frame(vm, frame);
+#ifdef EVE_OPTIMIZE_IMPORTS
+      if (filename) {
+        // create the directory if it doesn't exist, or fail silently
+        mkdir(dir_buff, 0777);
+        // serialize the imported module, and store under __eve__ directory
+        EveSerde serde;
+        init_serde(&serde, SD_SERIALIZE, vm, (error_cb)serde_error_cb);
+        serialize(&serde, eco_file, func);
+        free_serde(&serde);
+      }
+#endif
     } else {
       vm->has_error = true;
     }

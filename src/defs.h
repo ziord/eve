@@ -28,6 +28,9 @@
 #define EVE_VERSION \
   EXPAND_AND_QUOTE(EVE_VERSION_MAJOR.EVE_VERSION_MINOR.EVE_VERSION_PATCH)
 
+// optimizations
+#define EVE_OPTIMIZE_IMPORTS
+
 typedef struct VM VM;
 
 #endif  //EVE_DEFS_H

@@ -1,0 +1,6 @@
+let mod = core::import("program.eve");
+assert mod;
+assert core::type(mod::Data) == "struct";
+let mod2 = core::import("program.eve");
+assert mod2 == mod;
+assert core::import("module.eve");

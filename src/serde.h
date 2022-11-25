@@ -19,7 +19,7 @@ typedef struct {
 
 void init_serde(EveSerde* serde, SerdeMode mode, VM* vm, error_cb cb);
 void free_serde(EveSerde* serde);
-bool serialize(EveSerde* serde, const char* fname, ObjFn* script);
-ObjFn* deserialize(EveSerde* serde, const char* fname);
+bool serialize(EveSerde* serde, const char* filename, ObjFn* script);
+ObjFn* deserialize(EveSerde* serde, const char* filename);
 
 #endif  //EVE_SERDE_H

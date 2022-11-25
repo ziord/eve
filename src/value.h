@@ -198,6 +198,7 @@ bool value_falsy(Value v);
 bool value_equal(Value a, Value b);
 Value object_to_string(VM* vm, Value val);
 Value value_to_string(VM* vm, Value val);
+Obj* create_object(VM* vm, ObjTy ty, size_t size);
 void free_object(VM* vm, Obj* obj);
 Value create_string(
     VM* vm,
@@ -205,6 +206,12 @@ Value create_string(
     char* str,
     int len,
     bool is_alloc);
+ObjString* create_de_string(
+    VM* vm,
+    ObjHashMap* table,
+    char* str,
+    int len,
+    uint32_t hash);
 ObjList* create_list(VM* vm, int len);
 ObjHashMap* create_hashmap(VM* vm);
 ObjFn* create_function(VM* vm);

@@ -369,6 +369,32 @@ Value create_string(
   return val;
 }
 
+ObjString* create_de_string(
+    VM* vm,
+    ObjHashMap* table,
+    char* str,
+    int len,
+    uint32_t hash) {
+  ObjString* string = hashmap_find_interned(table, str, len, hash);
+  Value val;
+  if (!string) {
+    string = CREATE_OBJ(vm, ObjString, OBJ_STR, sizeof(ObjString));
+    val = OBJ_VAL(string);
+    string->hash = hash;
+    string->str = str;
+    string->length = len;
+    // track the already allocated bytes
+    vm->gc.bytes_allocated += (len + 1);
+    hashmap_put(table, vm, val, FALSE_VAL);
+  } else {
+    val = OBJ_VAL(string);
+    // cleanup, since we already have the
+    // allocated string (and it's tracked)
+    free(str);
+  }
+  return string;
+}
+
 ObjList* create_list(VM* vm, int len) {
   int cap = GROW_CAPACITY(ALIGN_TO(len, BUFFER_INIT_SIZE));
   ObjList* list = CREATE_OBJ(

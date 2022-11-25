@@ -1,10 +1,13 @@
 #include <stdio.h>
 
 #include "src/compiler.h"
-#include "src/debug.h"
+#include "src/serde.h"
 #include "src/vm.h"
+#ifdef EVE_DEBUG
+  #include "src/debug.h"
+#endif
 
-int execute(char* fp) {
+int execute_eve(char* fp, const char* bin) {
   VM vm = new_vm();
   // parse
   char* src = NULL;
@@ -30,11 +33,34 @@ int execute(char* fp) {
     return RESULT_COMPILE_ERROR;
   }
   free_parser(&parser);
+  if (bin) {
+    EveSerde serde;
+    init_serde(&serde, SD_SERIALIZE, &vm, (error_cb)serde_error_cb);
+    serialize(&serde, bin, func);
+    free_serde(&serde);
+  }
   // run
   boot_vm(&vm, func);
   IResult ret = run(&vm);
   // destruct
   free(src);
+  free_vm(&vm);
+  return ret;
+}
+
+int execute_eco(char* fp) {
+  VM vm = new_vm();
+  EveSerde serde;
+  init_serde(&serde, SD_DESERIALIZE, &vm, (error_cb)serde_error_cb);
+  ObjFn* de_fun = deserialize(&serde, fp);
+  vm.is_compiling = true;
+  Compiler compiler;
+  new_compiler(&compiler, NULL, de_fun, &vm, NULL);
+#ifdef EVE_DEBUG
+  dis_code(&de_fun->code, get_func_name(de_fun));
+#endif
+  boot_vm(&vm, de_fun);
+  IResult ret = run(&vm);
   free_vm(&vm);
   return ret;
 }
@@ -45,7 +71,7 @@ int show_options() {
 }
 
 int show_help() {
-  printf("This is the Eve interpreter.\n");
+  printf("This is the Eve interpreter (version %s).\n", EVE_VERSION);
   printf("To run a program 'file.eve', do:\n");
   printf("\teve file.eve\n");
   printf("To view other options, simply use eve\n");
@@ -66,10 +92,11 @@ int parse_args(int argc, char* argv[]) {
       }
     }
     default:
-      return execute(argv[1]);
+      return execute_eve(argv[1], NULL);
   }
 }
 
 int main(int argc, char* argv[]) {
+  (void)execute_eco;
   return parse_args(argc, argv);
 }

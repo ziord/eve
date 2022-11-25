@@ -3,9 +3,13 @@
 
 #include <math.h>
 
-#include "debug.h"
+#include "defs.h"
 #include "gc.h"
 #include "util.h"
+
+#ifdef EVE_DEBUG
+  #include "debug.h"
+#endif
 
 #define FRAME_MAX (0x50)
 #define STACK_MAX ((FRAME_MAX) * (CONST_MAX + 1))
@@ -48,5 +52,6 @@ void free_vm(VM* vm);
 void boot_vm(VM* vm, ObjFn* func);
 IResult runtime_error(VM* vm, char* fmt, ...);
 IResult run(VM* vm);
+void serde_error_cb(VM* vm, char* fmt, ...);
 
 #endif  //EVE_VM_H

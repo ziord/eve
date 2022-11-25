@@ -137,6 +137,7 @@ void free_vm(VM* vm) {
 }
 
 void boot_vm(VM* vm, ObjFn* func) {
+  vm->is_compiling = true;
   vm->fp = vm->frames;
   vm->sp = vm->stack;
   // assumes that 'strings' hashmap has been initialized already by the compiler
@@ -162,6 +163,15 @@ IResult runtime_error(VM* vm, char* fmt, ...) {
   vfprintf(stderr, fmt, ap);
   va_end(ap);
   return RESULT_RUNTIME_ERROR;
+}
+
+void serde_error_cb(VM* vm, char* fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  va_end(ap);
+  free_vm(vm);
+  exit(EXIT_FAILURE);
 }
 
 inline static bool validate_subscript(

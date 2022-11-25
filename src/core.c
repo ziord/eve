@@ -410,7 +410,7 @@ Value fn_list_len(VM* vm, int argc, const Value* args) {
   return NUMBER_VAL(AS_LIST(*args)->elems.length);
 }
 
-Value fn_list_append(VM* vm, int argc, const Value* args) {}
+//Value fn_list_append(VM* vm, int argc, const Value* args) {}
 
 /***********************
 *  > core > hashmap
@@ -432,14 +432,14 @@ Value fn_map_put(VM* vm, int argc, const Value* args) {
 /**********************
 *  > core > struct
 ***********************/
-Value fn_struct_fields(VM* vm, int argc, const Value* args) {}
+//Value fn_struct_fields(VM* vm, int argc, const Value* args) {}
 
 /**********************
 *  > core > instance
 ***********************/
-Value fn_instance_props(VM* vm, int argc, const Value* args) {}
+//Value fn_instance_props(VM* vm, int argc, const Value* args) {}
 
 /*********************
 *  > core > module
 *********************/
-Value fn_module_path(VM* vm, int argc, const Value* args) {}
+//Value fn_module_path(VM* vm, int argc, const Value* args) {}

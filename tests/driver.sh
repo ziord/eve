@@ -1,8 +1,5 @@
 #!/bin/bash
-tmp=$(mktemp -d /tmp/eve-test-XXXXXX)
 eve=../eve/build/eve
-trap 'rm -rf $tmp' INT TERM HUP EXIT
-echo > "$tmp"/empty.eve
 
 check() {
   if [ $? -eq 0 ]; then
@@ -13,9 +10,21 @@ check() {
   fi
 }
 
-# --help
-${eve} -h | grep -q Eve
+# -h
+${eve} -h | grep -q "Eve interpreter"
 check -h
+
+# --help
+${eve} --help | grep -q "Eve interpreter"
+check --help
+
+# -v
+${eve} -v | grep -q Eve
+check -v
+
+# --version
+${eve} --version | grep -q Eve
+check --version
 
 # general options
 ${eve} | grep -q Usage

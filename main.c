@@ -66,7 +66,7 @@ int execute_eco(char* fp) {
 }
 
 int show_options() {
-  printf("Usage: eve [-h <help>] <input-file>\n");
+  printf("Usage: eve [-h | --help] [-v | --version] <input-file>\n");
   return 0;
 }
 
@@ -78,14 +78,24 @@ int show_help() {
   return 0;
 }
 
+int show_version() {
+  printf("Eve %s\n", EVE_VERSION);
+  return 0;
+}
+
 int parse_args(int argc, char* argv[]) {
   if (argc != 2) {
     return show_options();
   }
   switch (*(argv[1])) {
     case '-': {
-      if (strlen(argv[1]) == 2 && argv[1][1] == 'h') {
+      if (strlen(argv[1]) == 2 && argv[1][1] == 'h'
+          || strncmp(argv[1], "--help", 6) == 0) {
         return show_help();
+      } else if (
+          strlen(argv[1]) == 2 && argv[1][1] == 'v'
+          || strncmp(argv[1], "--version", 9) == 0) {
+        return show_version();
       } else {
         fputs("Err. Invalid arguments.\n", stderr);
         return show_options();

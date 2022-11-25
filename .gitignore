@@ -1,5 +1,6 @@
 grammars
 build
 .idea
+.DS_Store
 dump.txt
 tests/out.txt

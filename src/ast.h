@@ -254,8 +254,6 @@ union AstNode {
 };
 
 typedef struct {
-  int length;
-  int capacity;
   Vec nodes;
 } NodeStore;
 

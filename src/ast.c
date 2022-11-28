@@ -5,7 +5,6 @@ AstNode __node = (AstNode) {
 AstNode* error_node = &__node;
 
 void init_store(NodeStore* store) {
-  store->capacity = store->length = 0;
   vec_init(&store->nodes);
 }
 

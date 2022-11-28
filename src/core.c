@@ -266,7 +266,7 @@ inline static bool file_exists(char* path) {
 
 #define ASSERT_TYPE(vm, check, val, ret, ...) \
   if (!check(val)) { \
-    runtime_error(vm, __VA_ARGS__); \
+    runtime_error(vm, NOTHING_VAL, __VA_ARGS__); \
     return ret; \
   }
 
@@ -317,7 +317,11 @@ Value fn_import(VM* vm, int argc, const Value* args) {
   ObjString* fname = AS_STRING(value);
   ObjString* path = resolve_path(vm, fname);
   if (path == NULL) {
-    runtime_error(vm, "Could not resolve path to module '%s'", fname->str);
+    runtime_error(
+        vm,
+        NOTHING_VAL,
+        "Could not resolve path to module '%s'",
+        fname->str);
     return module;
   }
 #ifdef EVE_OPTIMIZE_IMPORTS
@@ -370,7 +374,7 @@ Value fn_import(VM* vm, int argc, const Value* args) {
   char* src = NULL;
   char* msg = read_file(path->str, &src);
   if (msg != NULL) {
-    runtime_error(vm, "%s - '%s'\n", msg, fname->str);
+    runtime_error(vm, NOTHING_VAL, "%s - '%s'\n", msg, fname->str);
     src ? free(src) : (void)0;
     return module;
   }

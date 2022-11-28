@@ -418,6 +418,7 @@ static AstNode* parse_var(Parser* parser, bool assignable) {
   /*
    * ID ("::" expr)? | ID { (ID = expr ("," ID = expr)*)? }
    */
+  Token prev_tok = parser->previous_tk;
   consume(parser, TK_IDENT);
   Token tok = parser->previous_tk;
   AstNode* node = new_node(parser);
@@ -426,8 +427,12 @@ static AstNode* parse_var(Parser* parser, bool assignable) {
       .len = tok.length,
       .name = tok.value,
       .type = AST_VAR};
+  bool is_struct = prev_tok.ty == TK_STRUCT;
+  bool is_if = !is_struct && prev_tok.ty == TK_IF;
+  bool is_while = !is_if && prev_tok.ty == TK_WHILE;
+  bool is_allowable = !is_struct && !is_if && !is_while;
   // ID { (ID = expr ("," ID = expr)*)? }
-  if (is_tty(parser, TK_LCURLY) && assignable) {
+  if (is_allowable && assignable && is_tty(parser, TK_LCURLY)) {
     // we'll represent struct instances as a StructCallNode ast node,
     // with AST_STRUCT_CALL type, and its (key=value) fields stored in a map
     advance(parser);

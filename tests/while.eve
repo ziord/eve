@@ -65,6 +65,12 @@ while a < 10 {
 assert x == y;
 assert x == 6;
 
+let p = 5;
+while p {
+    p -= 1;
+}
+assert p == 0;
+
 while true {
     while true {
         while true {

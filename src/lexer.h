@@ -50,6 +50,8 @@ typedef enum {
   TK_NONE,          // None
   TK_SHOW,          // show
   TK_LET,           // let
+  TK_TRY,           // try
+  TK_THROW,         // throw
   TK_ASSERT,        // assert
   TK_IF,            // if
   TK_FN,            // fn

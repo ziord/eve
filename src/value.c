@@ -295,7 +295,7 @@ Value value_to_string(VM* vm, Value val) {
       }
     } else {
       char buff[25];
-      int len = snprintf(buff, 25, "%g", AS_NUMBER(val));
+      int len = snprintf(buff, 25, "%.14g", AS_NUMBER(val));
       return (create_string(vm, &vm->strings, buff, len, false));
     }
   } else if (IS_BOOL(val)) {
@@ -647,6 +647,19 @@ bool hashmap_remove(ObjHashMap* table, Value key) {
     return true;
   }
   return false;
+}
+
+void hashmap_copy(VM* vm, ObjHashMap* map1, ObjHashMap* map2) {
+  // copy map2 into map1
+  if (!map1->capacity || !map2->capacity)
+    return;
+  HashEntry* entry;
+  for (int i = 0; i < map2->capacity; i++) {
+    entry = &map2->entries[i];
+    if (!IS_NOTHING(entry->key)) {
+      hashmap_put(map1, vm, entry->key, entry->value);
+    }
+  }
 }
 
 void hashmap_init(ObjHashMap* table) {

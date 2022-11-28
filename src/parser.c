@@ -40,6 +40,7 @@ typedef struct {
 
 static AstNode* _parse(Parser* parser, BindingPower bp);
 static AstNode* parse_func_decl(Parser* parser, bool is_lambda);
+static AstNode* parse_block_stmt(Parser* parser);
 static AstNode* parse_expr(Parser* parser);
 static AstNode* parse_num(Parser* parser, bool assignable);
 static AstNode* parse_unary(Parser* parser, bool assignable);
@@ -53,6 +54,7 @@ static AstNode* parse_map(Parser* parser, bool assignable);
 static AstNode*
 parse_subscript(Parser* parser, AstNode* left, bool assignable);
 static AstNode* parse_var(Parser* parser, bool assignable);
+static AstNode* parse_try(Parser* parser, bool assignable);
 static AstNode* parse_decls(Parser* parser);
 static AstNode* parse_stmt(Parser* parser);
 static AstNode* parse_func_expr(Parser* parser, bool assignable);
@@ -61,6 +63,7 @@ static AstNode*
 parse_dcol_expr(Parser* parser, AstNode* left, bool assignable);
 static AstNode*
 parse_dot_expr(Parser* parser, AstNode* left, bool assignable);
+static AstNode* parse_expr_stmt(Parser* parser);
 
 // clang-format off
 ExprParseTable p_table[] = {
@@ -106,6 +109,8 @@ ExprParseTable p_table[] = {
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_SHOW] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_LET] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_TRY] = {.bp = BP_ASSIGNMENT, .prefix = parse_try, .infix = NULL},
+  [TK_THROW] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_IF] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ELSE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ASSERT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -208,8 +213,10 @@ void display_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
 AstNode* parse_error(Parser* parser, ErrorTy ty, ErrorArgs* args) {
   //  parser->at_error = true;
   if (!parser->panicking) {
-    parser->errors++;
-    parser->panicking = true;
+    if (args && !args->is_warning) {
+      parser->errors++;
+      parser->panicking = true;
+    }
     if (parser->errors > 1) {
       fputc('\n', stderr);
     }
@@ -462,6 +469,32 @@ static AstNode* parse_var(Parser* parser, bool assignable) {
     return st_call;
   }
   return handle_aug_assign(parser, node, assignable, tok);
+}
+
+static AstNode* parse_try(Parser* parser, bool assignable) {
+  // try expr (else expr)?
+  int line = parser->current_tk.line;
+  consume(parser, TK_TRY);
+  AstNode* try_expr = parse_expr(parser);
+  AstNode *else_expr = NULL, *var = NULL;
+  if (match(parser, TK_ELSE)) {
+    else_expr = parse_expr(parser);
+  }
+  AstNode* node = new_node(parser);
+  node->try_h = (TryNode) {
+      .type = AST_TRY,
+      .try_expr = try_expr,
+      .else_expr = else_expr,
+      .line = line};
+  return node;
+}
+
+static AstNode* parse_throw(Parser* parser) {
+  // throw expr;
+  consume(parser, TK_THROW);
+  AstNode* node = parse_expr_stmt(parser);
+  node->num.type = AST_THROW;
+  return node;
 }
 
 static AstNode* parse_string(Parser* parser, bool assignable) {
@@ -845,7 +878,9 @@ static AstNode* parse_while_stmt(Parser* parser) {
 
 static AstNode* parse_return_stmt(Parser* parser) {
   if (!parser->func) {
-    return parse_error(parser, E0008, NULL);
+    AstNode* node = parse_error(parser, E0008, NULL);
+    advance(parser);  // skip 'return'
+    return node;
   }
   consume(parser, TK_RETURN);
   AstNode* node = new_node(parser);
@@ -879,6 +914,8 @@ static AstNode* parse_stmt(Parser* parser) {
       return parse_control_stmt(parser);
     case TK_RETURN:
       return parse_return_stmt(parser);
+    case TK_THROW:
+      return parse_throw(parser);
     default:
       return parse_expr_stmt(parser);
   }

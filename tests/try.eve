@@ -1,0 +1,97 @@
+fn foo() {
+    None / 4;
+}
+
+fn bar() {
+    foo();
+}
+
+fn buzz() {
+    bar();
+}
+
+fn bull() {
+    buzz();
+}
+
+let res = try bull() else 10;
+assert res == 10;
+
+try x / "a";
+assert core::type(try bull()) == "string";
+
+let x = try ~false else "didn't work";
+assert x == "didn't work";
+
+x = try None | None else 5 + 0xff * 25;
+assert x == 6380;
+
+let list = [1, 2, 3];
+let map = #{"a": 1, "b": 2, "c": 3};
+
+struct Foo {
+    @compose fox, fan, fun;
+    @declare fish => 5, fin => "deep";
+}
+
+let a = try list[100] else list[-1];
+assert a == 3;
+
+
+let c = try Foo::fox else Foo::fish;
+assert c == 5;
+
+let d = try Foo::fin;
+assert d == "deep";
+
+let e = try Foo::bad else "nope";
+assert e == "nope";
+
+let error = try bull();
+assert error == "Unsupported operand types for '/': None and number";
+
+let b = try map["missing"] else map["missing"] = "there now!";
+assert b == "there now!";
+assert map["missing"] == "there now!";
+
+let f = try Foo::fox();
+assert f == "Illegal/unknown property access 'fox'";
+
+let g = try bull(1, 2, 3,3, "fox");
+assert g == "'bull' function takes 0 argument(s) but got 5";
+
+assert (try f()) == "'string' type is not callable";
+assert (try hey) == "Name 'hey' is not defined";
+
+assert (try nah = 10) == "use of undefined variable 'nah'";
+
+let inst = Foo{};
+assert (try inst.does_not_exist) == "Illegal/unknown property access 'does_not_exist'";
+
+assert (try g.cant_set) == "Invalid property accessor for type 'string'";
+
+assert (try Foo.x = 5) == "Cannot set property on type 'struct'";
+
+assert (try inst {}) == "Cannot instantiate 'instance' type";
+assert (try g {}) == "Cannot instantiate 'string' type";
+
+assert (try list["bad"]) == "list subscript must be an integer, not string";
+assert (try list[1000]) == "list index not in range";
+
+let a = 2;
+assert (try a[100]) == "'number' type is not subscriptable";
+
+assert (try map["hmm"]) == "hashmap has no such key: 'hmm'";
+
+assert (try core::haha) == "Module 'core' has no property 'haha'";
+assert (try Foo.ohno) == "Invalid property accessor for type 'struct'";
+assert (try Foo.fish) == "Invalid property accessor for type 'struct'";
+
+assert (try "fox"[1] = 5) == "'string' type is not subscript-assignable";
+assert (try inst.xyz = 10) == "Instance of 'Foo' has no property 'xyz'";
+
+assert (try inst::xyz) == "Invalid field accessor for type 'instance'";
+
+assert (try core::exit()) == "'exit' function takes 1 argument(s) but got 0";
+
+assert (try ~false) == "Unsupported operand type for '~': bool";

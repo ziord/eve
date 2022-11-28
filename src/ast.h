@@ -39,6 +39,8 @@ typedef enum {
   AST_MAP,
   AST_UNIT,
   AST_VAR,
+  AST_TRY,
+  AST_THROW,
   AST_ASSIGN,
   AST_ERROR,
   AST_UNARY,
@@ -226,6 +228,13 @@ typedef struct {
 
 typedef struct {
   AstTy type;
+  int line;
+  AstNode* try_expr;
+  AstNode* else_expr;
+} TryNode;
+
+typedef struct {
+  AstTy type;
   Vec decls;
 } ProgramNode;
 
@@ -250,6 +259,7 @@ union AstNode {
   WhileStmtNode while_stmt;
   ControlStmtNode control_stmt;
   StructCallNode struct_call;
+  TryNode try_h;
   ProgramNode program;
 };
 

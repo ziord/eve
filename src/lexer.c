@@ -49,6 +49,8 @@ char* token_types[] = {
     [TK_EOF] = "<eof>",
     [TK_ERROR] = "<error>",
     [TK_LET] = "let",
+    [TK_TRY] = "try",
+    [TK_THROW] = "throw",
     [TK_ASSERT] = "assert",
     [TK_IF] = "if",
     [TK_ELSE] = "else",
@@ -250,7 +252,18 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
     case 'c':
       return expect(lexer, "ontinue", 1, 7, TK_CONTINUE);
     case 't':
-      return expect(lexer, "rue", 1, 3, TK_TRUE);
+      switch (*(lexer->start + 1)) {
+        case 'h':
+          return expect(lexer, "row", 2, 3, TK_THROW);
+        case 'r':
+          switch (*(lexer->start + 2)) {
+            case 'y':
+              return expect(lexer, "", 3, 0, TK_TRY);
+            case 'u':
+              return expect(lexer, "e", 3, 1, TK_TRUE);
+          }
+      }
+      break;
     case 'f':
       switch (*(lexer->start + 1)) {
         case 'n':

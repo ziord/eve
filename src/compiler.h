@@ -30,6 +30,7 @@ typedef struct Compiler {
   int locals_count;
   int controls_count;
   int upvalues_count;
+  int free_vars;
   LocalVar locals[CONST_MAX];
   Upvalue upvalues[CONST_MAX];
   LoopVar controls[MAX_CONTROLS];

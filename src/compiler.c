@@ -52,6 +52,7 @@ void new_compiler(
       .func = func,
       .vm = vm,
       .scope = 0,
+      .free_vars = 0,
       .locals_count = 0,
       .controls_count = 0,
       .upvalues_count = 0,
@@ -84,6 +85,10 @@ void compile_error(Compiler* compiler, char* fmt, ...) {
   va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
   va_end(ap);
+}
+
+inline static int get_free_var(Compiler* compiler) {
+  return compiler->free_vars++;
 }
 
 static int store_variable(Compiler* compiler, VarNode* var) {
@@ -443,16 +448,20 @@ void c_var_decl(Compiler* compiler, AstNode* node) {
   }
 }
 
-void c_block_stmt(Compiler* compiler, AstNode* node) {
+void c_block(Compiler* compiler, AstNode* node) {
   BlockStmtNode* block = CAST(BlockStmtNode*, node);
   compiler->scope++;
   for (int i = 0; i < vec_size(&block->stmts); i++) {
     c_(compiler, block->stmts.items[i]);
   }
   compiler->scope--;
+}
+
+void c_block_stmt(Compiler* compiler, AstNode* node) {
+  c_block(compiler, node);
   // use the last node's line if available, else the block's line
   int line = last_line(compiler);
-  pop_locals(compiler, line != -1 ? line : block->line);
+  pop_locals(compiler, line != -1 ? line : node->block_stmt.line);
 }
 
 void c_if_stmt(Compiler* compiler, AstNode* node) {
@@ -602,6 +611,32 @@ void c_struct_call(Compiler* compiler, AstNode* node) {
   emit_byte(compiler, (byte_t)map->length, last_line(compiler));
 }
 
+void c_try(Compiler* compiler, AstNode* node) {
+  // try expr (else expr)?
+  TryNode* try_node = CAST(TryNode*, node);
+  // push try handler (we're using emit_jump since it allows creation of a byte-code
+  // and slot reservation for its 2-byte operand)
+  int try_slot = emit_jump(compiler, $PUSH_TRY, try_node->line);
+  c_(compiler, try_node->try_expr);
+  // pop try handler if operation never erred
+  emit_byte(compiler, $POP_TRY, last_line(compiler));
+  // skip handler-expr if operation never erred
+  int else_end = emit_jump(compiler, $JMP, last_line(compiler));
+  patch_jump(compiler, try_slot);
+  if (try_node->else_expr) {
+    // pop the error off the top of the stack
+    emit_byte(compiler, $POP, try_node->line);
+    c_(compiler, try_node->else_expr);
+  }
+  patch_jump(compiler, else_end);
+}
+
+void c_throw(Compiler* compiler, AstNode* node) {
+  ExprStmtNode* ex_node = &node->expr_stmt;
+  c_(compiler, ex_node->expr);
+  emit_byte(compiler, $THROW, ex_node->line);
+}
+
 void c_function(Compiler* compiler, AstNode* node) {
   // let func = fn () {..} | fn func() {...}
   FuncNode* func = &node->func;
@@ -640,8 +675,9 @@ void c_function(Compiler* compiler, AstNode* node) {
     VarNode* param = &func->params[i]->var;
     init_lvar(&func_compiler, param);
   }
-  // compile function body
-  c_(&func_compiler, func->body);
+  // compile function body (use c_block() since no need to pop locals,
+  // return does this automatically)
+  c_block(&func_compiler, func->body);
   fn_obj->arity = func->params_count;
   fn_obj->env_len = func_compiler.upvalues_count;
   emit_value(compiler, $BUILD_CLOSURE, OBJ_VAL(fn_obj), func->line);
@@ -746,6 +782,12 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_DOT_EXPR:
       c_binary(compiler, node);
+      break;
+    case AST_TRY:
+      c_try(compiler, node);
+      break;
+    case AST_THROW:
+      c_throw(compiler, node);
       break;
     case AST_PROGRAM:
       c_program(compiler, node);

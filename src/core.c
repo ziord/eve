@@ -38,6 +38,7 @@ Value fn_exit(VM* vm, int argc, const Value* args);
 Value fn_type(VM* vm, int argc, const Value* args);
 Value fn_clock(VM* vm, int argc, const Value* args);
 Value fn_time(VM* vm, int argc, const Value* args);
+Value fn_offload(VM* vm, int argc, const Value* args);
 
 /*** string ***/
 Value fn_str_len(VM* vm, int argc, const Value* args);
@@ -107,7 +108,7 @@ Value fn_module_globals(VM* vm, int argc, const Value* args);
 struct ModuleData mod_data[] = {
     {.module_name = "core",
      .name_len = 4,
-     .field_len = 7,
+     .field_len = 8,
      .data =
          {
              // negative arity indicates varargs
@@ -118,6 +119,7 @@ struct ModuleData mod_data[] = {
              {.name = "type", .arity = 1, .func = fn_type},
              {.name = "clock", .arity = 0, .func = fn_clock},
              {.name = "time", .arity = 0, .func = fn_time},
+             {.name = "offload", .arity = 0, .func = fn_offload},
          }},
     {.module_name = "string",
      .name_len = 6,
@@ -444,6 +446,12 @@ Value fn_clock(VM* vm, int argc, const Value* args) {
 Value fn_time(VM* vm, int argc, const Value* args) {
   (void)argc, (void)vm, (void)args;
   return NUMBER_VAL((double)time(NULL));
+}
+
+Value fn_offload(VM* vm, int argc, const Value* args) {
+  (void)argc, (void)args;
+  hashmap_copy(vm, &vm->current_module->fields, &vm->builtins->fields);
+  return NONE_VAL;
 }
 
 /***********************

@@ -61,3 +61,15 @@ assert core::time() > 1669268746.435078;
 assert core::clock;
 assert core::type(core::clock()) == "number";
 assert core::clock() > 1e-5;
+
+## offload
+core::offload();  ## dump all fields in the core module to this module's global space
+assert print;
+assert hashmap;
+assert string;
+assert import;
+assert type;
+assert offload;
+
+assert string::len("this is a function stuff") == 24;
+assert list::len([5]) == 1;

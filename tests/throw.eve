@@ -1,0 +1,58 @@
+fn throw_num() {
+    throw 35.e-4;
+}
+
+fn throw_str() {
+    throw "funny";
+}
+
+fn throw_struct() {
+    struct Fox {}
+    throw Fox;
+}
+
+struct Bar {}
+
+fn throw_struct2() {
+    throw Bar;
+}
+
+fn single() {
+    throw throw_num();
+}
+
+fn double() {
+    throw single();
+}
+
+fn bypass_assert() {
+    assert false;
+}
+
+fn bypass_assert2() {
+    assert false, "haha bypassing!";
+}
+
+fn throw_none() {
+    throw None;
+}
+
+
+let k = try throw_num() else 10;
+assert k == 10;
+k = try throw_num();
+assert k == 0.0035;
+
+k = try throw_str();
+assert k == "funny";
+
+assert (try single()) == 0.0035;
+assert (try double()) == 0.0035;
+
+assert (try bypass_assert()) == "Assertion Failed: Assertion failed. Test is falsy.";
+assert (try bypass_assert2()) == "Assertion Failed: haha bypassing!";
+
+assert core::type(try throw_struct()) == "struct";
+assert (try throw_struct2()) == Bar;
+
+assert (try throw_none()) == None;

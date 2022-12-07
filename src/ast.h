@@ -52,6 +52,8 @@ typedef enum {
   AST_BLOCK_STMT,
   AST_IF_STMT,
   AST_WHILE_STMT,
+  AST_FOR_STMT,
+  AST_LOOP,
   AST_CONTROL_STMT,
   AST_RETURN_STMT,
   AST_VAR_DECL,
@@ -184,6 +186,15 @@ typedef struct {
 typedef struct {
   AstTy type;
   int line;
+  AstNode* elem;
+  AstNode* iterable;
+  AstNode* block;
+  AstNode* desugar;
+} ForStmtNode;
+
+typedef struct {
+  AstTy type;
+  int line;
   int params_count;
   AstNode* params[CONST_MAX];
   AstNode* name;  // VarNode
@@ -257,6 +268,7 @@ union AstNode {
   BlockStmtNode block_stmt;
   IfElseStmtNode ife_stmt;
   WhileStmtNode while_stmt;
+  ForStmtNode for_stmt;
   ControlStmtNode control_stmt;
   StructCallNode struct_call;
   TryNode try_h;

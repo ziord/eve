@@ -47,3 +47,14 @@ assert dict[f].x() == "true";
 assert dict[a] == 5;
 assert dict[b] == 10;
 assert dict["Foo"] == 15;
+
+let x = #{};
+core::hashmap;
+assert core::hashmap::len(x) == 0;
+
+core::hashmap::put(x, "fish", "this is it");
+assert x["fish"] == "this is it";
+assert core::hashmap::len(x) == 1;
+
+core::hashmap::put(x, "film", "this is that");
+assert core::hashmap::len(x) == 2;

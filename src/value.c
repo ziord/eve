@@ -662,6 +662,17 @@ void hashmap_copy(VM* vm, ObjHashMap* map1, ObjHashMap* map2) {
   }
 }
 
+void hashmap_get_keys(ObjHashMap* table, ObjList* list) {
+  HashEntry* entry;
+  int index = 0;
+  for (int i = 0; i < table->capacity; i++) {
+    entry = &table->entries[i];
+    if (!IS_NOTHING(entry->key)) {
+      list->elems.buffer[index++] = entry->key;
+    }
+  }
+}
+
 void hashmap_init(ObjHashMap* table) {
   table->length = table->capacity = 0;
   table->entries = NULL;

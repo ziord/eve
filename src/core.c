@@ -39,6 +39,8 @@ Value fn_type(VM* vm, int argc, const Value* args);
 Value fn_clock(VM* vm, int argc, const Value* args);
 Value fn_time(VM* vm, int argc, const Value* args);
 Value fn_offload(VM* vm, int argc, const Value* args);
+Value fn_iter(VM* vm, int argc, const Value* args);
+Value fn_next(VM* vm, int argc, const Value* args);
 
 /*** string ***/
 Value fn_str_len(VM* vm, int argc, const Value* args);
@@ -63,6 +65,8 @@ Value fn_str_count(VM* vm, int argc, const Value* args);
 
 /*** list ***/
 Value fn_list_len(VM* vm, int argc, const Value* args);
+Value get_list_iterator_instance(VM* vm, Value list);
+Value get_list_iterator_instance_next(VM* vm, Value li_instance);
 Value fn_list_append(VM* vm, int argc, const Value* args);
 Value fn_list_pop(VM* vm, int argc, const Value* args);
 Value fn_list_clear(VM* vm, int argc, const Value* args);
@@ -108,7 +112,7 @@ Value fn_module_globals(VM* vm, int argc, const Value* args);
 struct ModuleData mod_data[] = {
     {.module_name = "core",
      .name_len = 4,
-     .field_len = 8,
+     .field_len = 10,
      .data =
          {
              // negative arity indicates varargs
@@ -120,6 +124,8 @@ struct ModuleData mod_data[] = {
              {.name = "clock", .arity = 0, .func = fn_clock},
              {.name = "time", .arity = 0, .func = fn_time},
              {.name = "offload", .arity = 0, .func = fn_offload},
+             {.name = "iter", .arity = 1, .func = fn_iter},
+             {.name = "next", .arity = 1, .func = fn_next},
          }},
     {.module_name = "string",
      .name_len = 6,
@@ -137,10 +143,11 @@ struct ModuleData mod_data[] = {
          }},
     {.module_name = "hashmap",
      .name_len = 7,
-     .field_len = 1,
+     .field_len = 2,
      .data =
          {
              {.name = "put", .arity = 3, .func = fn_map_put},
+             {.name = "len", .arity = 1, .func = fn_map_len},
          }},
 };
 
@@ -246,6 +253,15 @@ void init_builtins(VM* vm) {
     // store the module in the core module
     hashmap_put(&vm->builtins->fields, vm, modname_val, OBJ_VAL(module));
   }
+  // setup builtin structs
+  //. list_iterator todo: move this into an internals struct in the vm
+  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  Value list = create_string(vm, &vm->strings, "$_list", 6, false);
+  Value name = create_string(vm, &vm->strings, "list_iterator", 13, false);
+  ObjStruct* list_iterator = create_struct(vm, AS_STRING(name));
+  hashmap_put(&list_iterator->fields, vm, curr, NOTHING_VAL);
+  hashmap_put(&list_iterator->fields, vm, list, NOTHING_VAL);
+  hashmap_put(&vm->builtins->fields, vm, name, OBJ_VAL(list_iterator));
 }
 
 void init_module(VM* vm, ObjStruct* module) {
@@ -264,10 +280,10 @@ inline static bool file_exists(char* path) {
   return file && !fclose(file);
 }
 
-#define ASSERT_TYPE(vm, check, val, ret, ...) \
+#define ASSERT_TYPE(vm, check, val, ...) \
   if (!check(val)) { \
     runtime_error(vm, NOTHING_VAL, __VA_ARGS__); \
-    return ret; \
+    return NOTHING_VAL; \
   }
 
 /*********************
@@ -302,7 +318,6 @@ Value fn_import(VM* vm, int argc, const Value* args) {
       vm,
       IS_STRING,
       value,
-      NONE_VAL,
       "Expected argument of type 'string', but got '%s'",
       get_value_type(value));
   // set flag to prevent the gc from triggering during compilation
@@ -311,8 +326,6 @@ Value fn_import(VM* vm, int argc, const Value* args) {
   // if the module is already cached, just return it
   if ((module = hashmap_get(&vm->modules, value)) != NOTHING_VAL) {
     return module;
-  } else {
-    module = NONE_VAL;
   }
   ObjString* fname = AS_STRING(value);
   ObjString* path = resolve_path(vm, fname);
@@ -429,7 +442,6 @@ Value fn_exit(VM* vm, int argc, const Value* args) {
       vm,
       IS_NUMBER,
       *args,
-      NONE_VAL,
       "Expected argument of type 'number', but got '%s'",
       get_value_type(*args));
   free_vm(vm);
@@ -458,6 +470,92 @@ Value fn_offload(VM* vm, int argc, const Value* args) {
   return NONE_VAL;
 }
 
+Value fn_iter(VM* vm, int argc, const Value* args) {
+  (void)argc;
+  Value iterable = *args;
+  if (IS_LIST(iterable)) {
+    // get list iterable
+    Value li_instance = get_list_iterator_instance(vm, iterable);
+    return li_instance;
+  } else if (IS_HMAP(iterable)) {
+    ObjHashMap* map = AS_HMAP(iterable);
+    ObjList* list = create_list(vm, map->length);
+    vm_push_stack(vm, OBJ_VAL(list));
+    hashmap_get_keys(map, list);
+    Value li_instance = get_list_iterator_instance(vm, OBJ_VAL(list));
+    vm_pop_stack(vm);
+    return li_instance;
+  } else if (IS_INSTANCE(iterable)) {
+    Value str = create_string(vm, &vm->strings, "iter", 4, false);
+    Value iter = hashmap_get(&AS_INSTANCE(iterable)->fields, str);
+    if (IS_CLOSURE(iter) || IS_CFUNC(iter)) {
+      vm_pop_stack(vm);
+      vm_call_value(vm, iter, 0);
+      vm_push_stack(vm, *args);
+      return NONE_VAL;
+    } else if (iter == NOTHING_VAL) {
+      runtime_error(
+          vm,
+          NOTHING_VAL,
+          "'%s' type has no property 'iter'",
+          get_value_type(iterable));
+      return NOTHING_VAL;
+    } else {
+      return iter;
+    }
+  }
+  runtime_error(
+      vm,
+      NOTHING_VAL,
+      "'%s' type is not iterable",
+      get_value_type(iterable));
+  return NOTHING_VAL;
+}
+
+Value fn_next(VM* vm, int argc, const Value* args) {
+  (void)argc;
+  Value iterator = *args;
+  if (IS_INSTANCE(iterator)) {
+    ObjInstance* instance = AS_INSTANCE(iterator);
+    Value name =
+        create_string(vm, &vm->strings, "list_iterator", 13, false);
+    if (instance->strukt->name == AS_STRING(name)) {
+      Value strukt = hashmap_get(&vm->builtins->fields, name);
+      if (AS_STRUCT(strukt) == instance->strukt) {
+        return get_list_iterator_instance_next(vm, iterator);
+      }
+    }
+    Value str = create_string(vm, &vm->strings, "next", 4, false);
+    Value next = hashmap_get(&instance->fields, str);
+    if (IS_CLOSURE(next) || IS_CFUNC(next)) {
+      vm_pop_stack(vm);
+      vm_call_value(vm, next, 0);
+      vm_push_stack(vm, *args);
+      return NONE_VAL;
+    } else if (next == NOTHING_VAL) {
+      runtime_error(
+          vm,
+          NOTHING_VAL,
+          "'%s' type has no property 'next'",
+          get_value_type(iterator));
+      return NOTHING_VAL;
+    } else {
+      return next;
+    }
+  } else if (IS_CLOSURE(iterator) || IS_CFUNC(iterator)) {
+    vm_pop_stack(vm);  // balance up stack effect for call_value
+    vm_call_value(vm, iterator, 0);
+    vm_push_stack(vm, *args);  // balance up stack effect for call_value
+    return NONE_VAL;
+  }
+  runtime_error(
+      vm,
+      NOTHING_VAL,
+      "'%s' type is not an iterator",
+      get_value_type(iterator));
+  return NOTHING_VAL;
+}
+
 /***********************
 *  > core > string
 ***********************/
@@ -466,7 +564,6 @@ Value fn_str_len(VM* vm, int argc, const Value* args) {
       vm,
       IS_STRING,
       *args,
-      NUMBER_VAL(-1),
       "Expected argument of type 'string', but got '%s'",
       get_value_type(*args));
   (void)argc;
@@ -476,12 +573,59 @@ Value fn_str_len(VM* vm, int argc, const Value* args) {
 /**********************
 *  > core > list
 **********************/
+Value get_list_iterator_instance(VM* vm, Value list_val) {
+  // core::iter([]) -> list_iterator instance
+  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  vm_push_stack(vm, curr);
+  Value list = create_string(vm, &vm->strings, "$_list", 6, false);
+  vm_push_stack(vm, list);
+  Value name = create_string(vm, &vm->strings, "list_iterator", 13, false);
+  vm_push_stack(vm, name);
+  ObjStruct* list_iterator =
+      AS_STRUCT(hashmap_get(&vm->builtins->fields, name));
+  ObjInstance* iterator_inst = create_instance(vm, list_iterator);
+  vm_push_stack(vm, OBJ_VAL(iterator_inst));
+  hashmap_put(&iterator_inst->fields, vm, curr, NONE_VAL);
+  hashmap_put(&iterator_inst->fields, vm, list, list_val);
+  vm->sp -= 4;
+  return OBJ_VAL(iterator_inst);
+}
+
+Value get_list_iterator_instance_next(VM* vm, Value li_instance) {
+  ObjInstance* instance = AS_INSTANCE(li_instance);
+  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  Value list = create_string(vm, &vm->strings, "$_list", 6, false);
+  Value list_val = hashmap_get(&instance->fields, list);
+  Value curr_idx = hashmap_get(&instance->fields, curr);
+  if (list_val == NOTHING_VAL || curr_idx == NOTHING_VAL) {
+    runtime_error(
+        vm,
+        NOTHING_VAL,
+        "Could not obtain list_iterator internal field");
+    return NOTHING_VAL;
+  }
+  int index;
+  ObjList* list_obj = AS_LIST(list_val);
+  if (curr_idx == NONE_VAL) {
+    index = 0;
+  } else {
+    index = AS_NUMBER(curr_idx) + 1;
+  }
+  if (index >= list_obj->elems.length) {
+    runtime_error(vm, NOTHING_VAL, "StopIteration");
+    return NOTHING_VAL;
+  } else {
+    Value elem = list_obj->elems.buffer[index];
+    hashmap_put(&instance->fields, vm, curr, NUMBER_VAL(index));
+    return elem;
+  }
+}
+
 Value fn_list_len(VM* vm, int argc, const Value* args) {
   ASSERT_TYPE(
       vm,
       IS_LIST,
       *args,
-      NUMBER_VAL(-1),
       "Expected argument of type 'list', but got '%s'",
       get_value_type(*args));
   (void)argc;
@@ -500,11 +644,21 @@ Value fn_map_put(VM* vm, int argc, const Value* args) {
       vm,
       IS_HMAP,
       *args,
-      NUMBER_VAL(-1),
       "Expected first argument of type 'map', but got '%s'",
       get_value_type(map));
   hashmap_put(AS_HMAP(map), vm, *(args + 1), value);
   return value;
+}
+
+Value fn_map_len(VM* vm, int argc, const Value* args) {
+  ASSERT_TYPE(
+      vm,
+      IS_HMAP,
+      *args,
+      "Expected argument of type 'hashmap', but got '%s'",
+      get_value_type(*args));
+  (void)argc;
+  return NUMBER_VAL(AS_HMAP(*args)->length);
 }
 
 /**********************

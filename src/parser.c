@@ -115,6 +115,8 @@ ExprParseTable p_table[] = {
   [TK_ELSE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_ASSERT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_FN] = {.bp = BP_NONE, .prefix = parse_func_expr, .infix = NULL},
+  [TK_FOR] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
+  [TK_IN] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_WHILE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_CONTINUE] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_RETURN] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
@@ -437,7 +439,8 @@ static AstNode* parse_var(Parser* parser, bool assignable) {
   bool is_struct = prev_tok.ty == TK_STRUCT;
   bool is_if = !is_struct && prev_tok.ty == TK_IF;
   bool is_while = !is_if && prev_tok.ty == TK_WHILE;
-  bool is_allowable = !is_struct && !is_if && !is_while;
+  bool is_in = !is_while && prev_tok.ty == TK_IN;
+  bool is_allowable = !is_struct && !is_if && !is_while && !is_in;
   // ID { (ID = expr ("," ID = expr)*)? }
   if (is_allowable && assignable && is_tty(parser, TK_LCURLY)) {
     // we'll represent struct instances as a StructCallNode ast node,
@@ -876,6 +879,52 @@ static AstNode* parse_while_stmt(Parser* parser) {
   return node;
 }
 
+static AstNode* parse_for_stmt(Parser* parser) {
+  /*
+   * for let elem in iterable {
+   *  stmt
+   * }
+   */
+  parser->loop++;
+  int line = parser->current_tk.line;
+  int column = parser->lexer.column;
+  consume(parser, TK_FOR);
+  consume(parser, TK_LET);
+  AstNode* elem = parse_var(parser, false);
+  consume(parser, TK_IN);
+  AstNode* iterable = parse_expr(parser);
+  AstNode* block = parse_block_stmt(parser);
+  AstNode* node = new_node(parser);
+  node->for_stmt = (ForStmtNode) {
+      .line = line,
+      .type = AST_FOR_STMT,
+      .block = block,
+      .elem = elem,
+      .iterable = iterable};
+
+  char* template =
+      "{\n"
+      "        let is_error = false;\n"
+      "        let itr = core::iter(obj);\n"
+      "        while true {\n"
+      "            let i = try core::next(itr) else is_error = true;\n"
+      "            if is_error {\n"
+      "                break;\n"
+      "            }\n"
+      "        }\n"
+      "}";
+  Parser prs = new_parser(template, "");
+  prs.lexer.line = line;
+  prs.lexer.column = column;
+  AstNode* desugar = parse(&prs);
+  node->for_stmt.desugar = desugar->program.decls.items[0];
+  vec_free(&desugar->program.decls);  // free ProgramNode Vec decls
+  // store all allocated nodes in the original parser.
+  vec_extend(&parser->store.nodes, &prs.store.nodes);
+  parser->loop--;
+  return node;
+}
+
 static AstNode* parse_return_stmt(Parser* parser) {
   if (!parser->func) {
     AstNode* node = parse_error(parser, E0008, NULL);
@@ -909,6 +958,8 @@ static AstNode* parse_stmt(Parser* parser) {
       return parse_if_stmt(parser);
     case TK_WHILE:
       return parse_while_stmt(parser);
+    case TK_FOR:
+      return parse_for_stmt(parser);
     case TK_BREAK:
     case TK_CONTINUE:
       return parse_control_stmt(parser);

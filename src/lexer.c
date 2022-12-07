@@ -58,6 +58,8 @@ char* token_types[] = {
     [TK_BREAK] = "break",
     [TK_CONTINUE] = "continue",
     [TK_FN] = "fn",
+    [TK_FOR] = "for",
+    [TK_IN] = "in",
     [TK_RETURN] = "return",
     [TK_STRUCT] = "struct",
 };
@@ -270,6 +272,8 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
           return expect(lexer, "", 2, 0, TK_FN);
         case 'a':
           return expect(lexer, "lse", 2, 3, TK_FALSE);
+        case 'o':
+          return expect(lexer, "r", 2, 1, TK_FOR);
       }
       break;
     case 'N':
@@ -287,7 +291,12 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
     case 'r':
       return expect(lexer, "eturn", 1, 5, TK_RETURN);
     case 'i':
-      return expect(lexer, "f", 1, 1, TK_IF);
+      switch (*(lexer->start + 1)) {
+        case 'n':
+          return expect(lexer, "n", 1, 1, TK_IN);
+        case 'f':
+          return expect(lexer, "f", 1, 1, TK_IF);
+      }
     case 'e':
       return expect(lexer, "lse", 1, 3, TK_ELSE);
     case 'l':

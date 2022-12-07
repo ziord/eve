@@ -58,6 +58,7 @@
 #define KB_SIZE (1024)
 
 inline static void close_upvalues(VM* vm, const Value* slot);
+inline static bool call_value(VM* vm, Value val, int argc, bool is_tco);
 
 inline static Value pop_stack(VM* vm) {
   return *(--vm->sp);
@@ -74,6 +75,10 @@ Value vm_pop_stack(VM* vm) {
 
 void vm_push_stack(VM* vm, Value val) {
   push_stack(vm, val);
+}
+
+bool vm_call_value(VM* vm, Value val, int argc) {
+  return call_value(vm, val, argc, false);
 }
 
 inline static bool push_frame(VM* vm, CallFrame frame) {
@@ -229,6 +234,7 @@ IResult runtime_error(VM* vm, Value err, char* fmt, ...) {
   int repeating_frames = 0;
   CallFrame* prev_frame = NULL;
   ObjString* last_file = NULL;
+  size_t offset;
   fputs("Runtime Error: ", stderr);
   va_start(ap, fmt);
   vfprintf(stderr, fmt, ap);
@@ -244,6 +250,7 @@ IResult runtime_error(VM* vm, Value err, char* fmt, ...) {
         continue;
       }
     }
+    offset = vm->fp->ip - vm->fp->closure->func->code.bytes - 1;
     if (vm->frame_count > 1) {
       if (last_file != vm->fp->closure->func->module->name) {
         fprintf(
@@ -257,16 +264,14 @@ IResult runtime_error(VM* vm, Value err, char* fmt, ...) {
           stderr,
           "in %s(), line %d\n",
           get_func_name(vm->fp->closure->func),
-          vm->fp->closure->func->code
-              .lines[vm->fp->ip - vm->fp->closure->func->code.bytes]);
+          vm->fp->closure->func->code.lines[offset]);
     } else {
       // last frame
       fprintf(
           stderr,
           "File %s, line %d\n",
           vm->fp->closure->func->module->name->str,
-          vm->fp->closure->func->code
-              .lines[vm->fp->ip - vm->fp->closure->func->code.bytes]);
+          vm->fp->closure->func->code.lines[offset]);
     }
     last_file = vm->fp->closure->func->module->name;
     prev_frame = vm->fp;
@@ -503,7 +508,7 @@ perform_subscript_assign(VM* vm, Value var, Value subscript, Value value) {
   return false;
 }
 
-inline static bool call_value(VM* vm, Value val, int argc, bool is_tco) {
+inline bool call_value(VM* vm, Value val, int argc, bool is_tco) {
   if (IS_CLOSURE(val)) {
     ObjFn* fn = AS_CLOSURE(val)->func;
     if (argc == fn->arity) {
@@ -537,8 +542,12 @@ inline static bool call_value(VM* vm, Value val, int argc, bool is_tco) {
     ObjCFn* fn = AS_CFUNC(val);
     if (fn->arity == argc || fn->arity < 0) {
       Value res = fn->fn(vm, argc, vm->sp - argc);
-      vm->sp -= (argc + 1);
-      push_stack(vm, res);
+      // only push the result if no error occurred.
+      // we use NOTHING_VAL return value as an error flag
+      if (res != NOTHING_VAL) {
+        vm->sp -= (argc + 1);
+        push_stack(vm, res);
+      }
       return !vm->has_error;
     }
     runtime_error(

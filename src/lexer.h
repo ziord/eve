@@ -55,6 +55,8 @@ typedef enum {
   TK_ASSERT,        // assert
   TK_IF,            // if
   TK_FN,            // fn
+  TK_FOR,           // for
+  TK_IN,            // in
   TK_ELSE,          // else
   TK_WHILE,         // while
   TK_BREAK,         // break

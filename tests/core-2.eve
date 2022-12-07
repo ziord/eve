@@ -1,18 +1,14 @@
-let x = "foobar";
+## core iter
+assert core::iter;
+let foo = [1, 2];
+let ifoo = core::iter(foo);
+assert core::next(ifoo) == 1;
+assert core::next(ifoo) == 2;
+assert try core::next(ifoo) == "StopIteration";
 
-#** core string **#
-assert core::string;
-assert core::string::len("the perks of being a wallflower") == 31;
-assert core::string::len("") == 0;
-assert core::string::len(x) == 6;
-
-#** core list **#
-assert core::list;
-assert core::list::len([2, 3, 4, 5, 6]) == 5;
-assert core::list::len([]) == 0;
-
-#** core hashmap **#
-let x = #{};
-core::hashmap;
-core::hashmap::put(x, "fish", "this is it");
-assert x["fish"] == "this is it";
+## core next
+assert core::next;
+let bar = #{"a": 1};
+let ibar = core::iter(bar);
+assert core::next(ibar) == "a";
+assert try core::next(ibar) == "StopIteration";

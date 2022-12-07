@@ -3,3 +3,9 @@ assert "fox\t"[-1] == "\t";
 assert "fox\t"[0] == "f";
 assert "fox\t"[3] == "\t";
 assert "fish - \r\n\b\a - fan" == "fish - \r\n\b\a - fan";
+
+let x = "foobar";
+assert core::string;
+assert core::string::len("the perks of being a wallflower") == 31;
+assert core::string::len("") == 0;
+assert core::string::len(x) == 6;

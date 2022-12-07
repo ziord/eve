@@ -116,7 +116,7 @@ void mark_object(VM* vm, Obj* obj) {
   if (!obj || obj->marked)
     return;
 #if defined(EVE_DEBUG_GC)
-  printf("   * mark object %p (", obj);
+  printf("   * mark object %p type %d (", obj, obj->type);
   print_value(OBJ_VAL(obj));
   printf(")\n");
 #endif

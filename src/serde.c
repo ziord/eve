@@ -53,13 +53,23 @@ void free_serde(EveSerde* serde) {
 
 void write_magic_bits(EveSerde* serde) {
   uint64_t bits = MAGIC_BITS;
+  int version[] = {EVE_VERSION_MAJOR, EVE_VERSION_MINOR, EVE_VERSION_PATCH};
   fwrite(&bits, sizeof(uint64_t), 1, serde->file);
+  fwrite(&version, sizeof(int), 3, serde->file);
 }
 
-bool check_magic_bits(EveSerde* serde) {
+static inline bool check_magic_bits(EveSerde* serde) {
   uint64_t bits;
   fread(&bits, sizeof(uint64_t), 1, serde->file);
   return bits == MAGIC_BITS;
+}
+
+static inline bool check_version(EveSerde* serde) {
+  int version[3];
+  fread(&version, sizeof(int), 3, serde->file);
+  return (
+      version[0] == EVE_VERSION_MAJOR && version[1] == EVE_VERSION_MINOR
+      && version[2] == EVE_VERSION_PATCH);
 }
 
 void ser_code(EveSerde* serde, Code* code) {
@@ -362,8 +372,7 @@ ObjFn* deserialize(EveSerde* serde, const char* filename) {
     return false;
   }
   serde->file = file;
-  if (!check_magic_bits(serde)) {
-    serde->callback(serde->vm, "Invalid eco file");
+  if (!check_magic_bits(serde) || !check_version(serde)) {
     return UNUSED(NULL);
   }
   ObjFn* func = de_fn(serde);

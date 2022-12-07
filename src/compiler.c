@@ -545,6 +545,91 @@ void c_while_stmt(Compiler* compiler, AstNode* node) {
   compiler->current_loop = curr;
 }
 
+void c_loop(Compiler* compiler, AstNode* node) {
+  WhileStmtNode* wh_node = CAST(WhileStmtNode*, node);
+  LoopVar curr = compiler->current_loop;
+  compiler->current_loop = (LoopVar) {.scope = compiler->scope};
+  int continue_exit = compiler->func->code.length;
+  c_(compiler, wh_node->block);
+  emit_loop(compiler, continue_exit, last_line(compiler));
+  // pop loop condition off the stack
+  emit_byte(compiler, $POP, last_line(compiler));
+  int break_exit = compiler->func->code.length;
+  process_loop_control(compiler, continue_exit, break_exit);
+  compiler->current_loop = curr;
+}
+
+void c_for_stmt(Compiler* compiler, AstNode* node) {
+  /*
+   * for let elem in iterable {}
+   * |
+   * {
+        let is_error = false;
+        let itr = core::iter(iterable);
+        while (true) {
+            let i = try core::next(itr) else is_error = true ;
+            if is_error {
+                break;
+            }
+            ## rest of code...
+        }
+      }
+   */
+#define BUFF_SIZE 0xf
+  char is_err[BUFF_SIZE], itr[BUFF_SIZE];
+  int is_err_len =
+      snprintf(is_err, BUFF_SIZE, "$is_err_%d", get_free_var(compiler));
+  int itr_len =
+      snprintf(itr, BUFF_SIZE, "$iter_%d", get_free_var(compiler));
+#undef BUFF_SIZE
+
+  ForStmtNode* for_node = &node->for_stmt;
+  int line = for_node->line;
+  AstNode* desugar = for_node->desugar;
+  ASSERT(
+      desugar->num.type == AST_BLOCK_STMT,
+      "expected block stmt type as desugar");
+
+  compiler->scope++;
+  BlockStmtNode* block = &desugar->block_stmt;
+  // 1 let is_error = false;
+  BinaryNode* stmt = &((AstNode*)block->stmts.items[0])->binary;
+  stmt->l_node->var.name = is_err;
+  stmt->l_node->var.len = is_err_len;
+  stmt->l_node->var.line = line;
+  AstNode* err_var = stmt->l_node;
+
+  // 2 let itr = core::iter(iterable);
+  stmt = &((AstNode*)block->stmts.items[1])->binary;
+  stmt->r_node->call.args[0] = for_node->iterable;
+  stmt->l_node->var.name = itr;
+  stmt->l_node->var.len = itr_len;
+  stmt->l_node->var.line = line;
+  AstNode* itr_var = stmt->l_node;
+
+  // 3
+  WhileStmtNode* wh = &((AstNode*)block->stmts.items[2])->while_stmt;
+  wh->type = AST_LOOP;
+  // let i = try core::next(itr) else is_error = true ;
+  stmt = &((AstNode*)(wh->block->block_stmt.stmts.items[0]))->binary;
+  stmt->l_node->var = for_node->elem->var;
+  stmt->r_node->try_h.try_expr->call.args[0] = itr_var;
+  stmt->r_node->try_h.else_expr->binary.l_node = err_var;
+
+  // if is_error {
+  IfElseStmtNode* if_stmt =
+      &((AstNode*)(wh->block->block_stmt.stmts.items[1]))->ife_stmt;
+  if_stmt->condition = err_var;
+  if_stmt->line = line;
+
+  // save the rest of the block...
+  Vec* to = &wh->block->block_stmt.stmts;
+  Vec* from = &for_node->block->block_stmt.stmts;
+  vec_extend(to, from);
+  c_(compiler, desugar);
+  compiler->scope--;
+}
+
 void c_return(Compiler* compiler, AstNode* node) {
   ExprStmtNode* expr = &node->expr_stmt;
   c_(compiler, expr->expr);
@@ -788,6 +873,12 @@ void c_(Compiler* compiler, AstNode* node) {
       break;
     case AST_THROW:
       c_throw(compiler, node);
+      break;
+    case AST_FOR_STMT:
+      c_for_stmt(compiler, node);
+      break;
+    case AST_LOOP:
+      c_loop(compiler, node);
       break;
     case AST_PROGRAM:
       c_program(compiler, node);

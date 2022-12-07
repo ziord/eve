@@ -228,6 +228,7 @@ Value hashmap_get(ObjHashMap* table, Value key);
 bool hashmap_has_key(ObjHashMap* table, Value key, Value* value);
 bool hashmap_remove(ObjHashMap* table, Value key);
 void hashmap_copy(VM* vm, ObjHashMap* map1, ObjHashMap* map2);
+void hashmap_get_keys(ObjHashMap* table, ObjList* list);
 ObjString*
 hashmap_find_interned(ObjHashMap* table, char* str, int len, uint32_t hash);
 

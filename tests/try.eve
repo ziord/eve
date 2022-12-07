@@ -95,3 +95,30 @@ assert (try inst::xyz) == "Invalid field accessor for type 'instance'";
 assert (try core::exit()) == "'exit' function takes 1 argument(s) but got 0";
 
 assert (try ~false) == "Unsupported operand type for '~': bool";
+
+let e = None;
+let x = try a_ ? e else core::print();
+assert e == "Name 'a_' is not defined";
+
+let p = None;
+let a = try core::next() ? p else p;
+assert p;
+assert a == "'next' function takes 1 argument(s) but got 0";
+assert a == p;
+let fun = None;
+{
+    let e = None;
+    let p = None;
+    let x = try core::iter(2) ? e else e;
+    assert x == "'number' type is not iterable";
+    assert e == x;
+    fun = fn(){return p;};
+    let y = try core::iter(2);
+    assert x == y;
+    show try core::next("fin") ? p else p;
+    show e,p;
+}
+show fun();
+
+try 2["a"] ? e;
+assert e == "'number' type is not subscriptable";

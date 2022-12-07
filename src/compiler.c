@@ -76,7 +76,7 @@ void new_compiler(
 }
 
 void compile_error(Compiler* compiler, char* fmt, ...) {
-  if (compiler->errors > 1) {
+  if (compiler->errors >= 1) {
     fputc('\n', stderr);
   }
   compiler->errors++;
@@ -125,6 +125,7 @@ inline static int add_lvar(Compiler* compiler, VarNode* node) {
   var->name = node->name;
   var->name_len = node->len;
   var->initialized = false;
+  var->is_captured = false;
   return compiler->locals_count - 1;
 }
 
@@ -204,6 +205,8 @@ inline static void pop_locals(Compiler* compiler, int line) {
         emit_byte(compiler, $POP, line);
       }
       compiler->locals_count--;
+    } else {
+      break;
     }
   }
 }
@@ -697,7 +700,7 @@ void c_struct_call(Compiler* compiler, AstNode* node) {
 }
 
 void c_try(Compiler* compiler, AstNode* node) {
-  // try expr (else expr)?
+  // try expr (? var)? (else expr)?
   TryNode* try_node = CAST(TryNode*, node);
   // push try handler (we're using emit_jump since it allows creation of a byte-code
   // and slot reservation for its 2-byte operand)
@@ -708,6 +711,19 @@ void c_try(Compiler* compiler, AstNode* node) {
   // skip handler-expr if operation never erred
   int else_end = emit_jump(compiler, $JMP, last_line(compiler));
   patch_jump(compiler, try_slot);
+  if (try_node->try_var) {
+    VarNode* var = &try_node->try_var->var;
+    int slot = find_lvar(compiler, var);
+    if (slot != -1) {
+      emit_byte(compiler, $SET_LOCAL, var->line);
+      emit_byte(compiler, (byte_t)slot, last_line(compiler));
+    } else if ((slot = find_upvalue(compiler, var)) != -1) {
+      emit_byte(compiler, $SET_UPVALUE, var->line);
+      emit_byte(compiler, (byte_t)slot, last_line(compiler));
+    } else {
+      load_variable(compiler, var, $SET_GLOBAL);
+    }
+  }
   if (try_node->else_expr) {
     // pop the error off the top of the stack
     emit_byte(compiler, $POP, try_node->line);

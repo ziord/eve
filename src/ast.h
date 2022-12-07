@@ -241,6 +241,7 @@ typedef struct {
   AstTy type;
   int line;
   AstNode* try_expr;
+  AstNode* try_var;
   AstNode* else_expr;
 } TryNode;
 

@@ -56,3 +56,22 @@ assert core::type(try throw_struct()) == "struct";
 assert (try throw_struct2()) == Bar;
 
 assert (try throw_none()) == None;
+
+try throw_none() ? k;
+assert k == None;
+
+{
+   try throw_struct2() ? k;
+   assert k == Bar;
+}
+
+fn fax() {
+    let k = 5;
+    return fn() {
+      assert k == 5;
+      try "oof" / 2 ? k;
+      assert k == "Unsupported operand types for '/': string and number";
+      return k;
+    };
+}
+assert fax()() == "Unsupported operand types for '/': string and number";

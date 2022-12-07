@@ -12,7 +12,6 @@ typedef enum {
   TK_PLUS,          // +
   TK_MINUS,         // -
   TK_STAR,          // *
-  TK_STAR_STAR,     // **
   TK_EXC_MARK,      // !
   TK_TILDE,         // ~
   TK_FSLASH,        // /
@@ -35,6 +34,8 @@ typedef enum {
   TK_COLON,         // :
   TK_SEMI_COLON,    // ;
   TK_DOT,           // .
+  TK_QMARK,         // ?
+  TK_STAR_STAR,     // **
   TK_DCOLON,        // ::
   TK_PIPE_PIPE,     // ||
   TK_AMP_AMP,       // &&

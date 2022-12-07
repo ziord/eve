@@ -104,6 +104,7 @@ ExprParseTable p_table[] = {
   [TK_ARROW] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_AT] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_DOT] = {.bp = BP_ACCESS, .prefix = NULL, .infix = parse_dot_expr},
+  [TK_QMARK] = {.bp = BP_NONE, .prefix = NULL, .infix = NULL},
   [TK_FALSE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_TRUE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
   [TK_NONE] = {.bp = BP_NONE, .prefix = parse_literal, .infix = NULL},
@@ -475,11 +476,14 @@ static AstNode* parse_var(Parser* parser, bool assignable) {
 }
 
 static AstNode* parse_try(Parser* parser, bool assignable) {
-  // try expr (else expr)?
+  // try expr (? var)? (else expr)?
   int line = parser->current_tk.line;
   consume(parser, TK_TRY);
   AstNode* try_expr = parse_expr(parser);
   AstNode *else_expr = NULL, *var = NULL;
+  if (match(parser, TK_QMARK)) {
+    var = parse_var(parser, false);
+  }
   if (match(parser, TK_ELSE)) {
     else_expr = parse_expr(parser);
   }
@@ -487,6 +491,7 @@ static AstNode* parse_try(Parser* parser, bool assignable) {
   node->try_h = (TryNode) {
       .type = AST_TRY,
       .try_expr = try_expr,
+      .try_var = var,
       .else_expr = else_expr,
       .line = line};
   return node;

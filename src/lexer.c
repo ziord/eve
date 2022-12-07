@@ -29,6 +29,7 @@ char* token_types[] = {
     [TK_COLON] = ":",
     [TK_SEMI_COLON] = ";",
     [TK_DOT] = ".",
+    [TK_QMARK] = "?",
     [TK_AT] = "@",
     [TK_DCOLON] = "::",
     [TK_PIPE_PIPE] = "||",
@@ -388,6 +389,8 @@ Token get_token(Lexer* lexer) {
       return new_token(lexer, TK_RSQ_BRACK);
     case '#':
       return new_token(lexer, TK_HASH);
+    case '?':
+      return new_token(lexer, TK_QMARK);
     case ':':
       return new_token(lexer, check(lexer, ':') ? TK_DCOLON : TK_COLON);
     case '{':

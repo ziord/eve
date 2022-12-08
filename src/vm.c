@@ -69,6 +69,10 @@ inline static void push_stack(VM* vm, Value val) {
   vm->sp++;
 }
 
+inline static TryCtx new_tryctx() {
+  return (TryCtx) {.sp = NULL, .handler_ip = NULL};
+}
+
 Value vm_pop_stack(VM* vm) {
   return pop_stack(vm);
 }
@@ -106,34 +110,23 @@ inline static CallFrame pop_frame(VM* vm) {
   return frame;
 }
 
-inline static bool push_try(VM* vm, int handler_ip) {
-  if (vm->try_count >= TRY_FRAME_MAX) {
-    runtime_error(vm, NOTHING_VAL, "Stack overflow: too many try frames");
-    return false;
-  }
-  TryCtx* ctx = &vm->try_ctxs[vm->try_count++];
-  ctx->handler_ip = vm->fp->ip + handler_ip;
-  ctx->sp = vm->sp;
+inline static bool set_try(VM* vm, int handler_ip) {
+  TryCtx ctx = {.handler_ip = vm->fp->ip + handler_ip, .sp = vm->sp};
   vm->fp->try_ctx = ctx;
   return true;
 }
 
-inline static TryCtx pop_try(VM* vm) {
-  TryCtx ctx = vm->try_ctxs[vm->try_count - 1];
-  vm->try_count--;
-  if (vm->try_count) {
-    vm->fp->try_ctx = &vm->try_ctxs[vm->try_count - 1];
-  } else {
-    vm->fp->try_ctx = NULL;
-  }
+inline static TryCtx tear_try(VM* vm) {
+  TryCtx ctx = vm->fp->try_ctx;
+  vm->fp->try_ctx = new_tryctx();
   return ctx;
 }
 
 inline static void handle_error(VM* vm, Value err, char* fmt, va_list* ap) {
-  TryCtx try_c = pop_try(vm);
-  vm->sp = try_c.sp;
-  vm->fp->ip = try_c.handler_ip;
+  vm->sp = vm->fp->try_ctx.sp;
+  vm->fp->ip = vm->fp->try_ctx.handler_ip;
   vm->has_error = false;
+  tear_try(vm);
   char buff[KB_SIZE];
   int len = vsnprintf(buff, KB_SIZE, fmt, *ap);
   va_end(*ap);
@@ -165,7 +158,6 @@ VM new_vm() {
       .objects = NULL,
       .sp = NULL,
       .frame_count = 0,
-      .try_count = 0,
       .is_compiling = true,
       .upvalues = NULL,
       .compiler = NULL,
@@ -205,7 +197,7 @@ void boot_vm(VM* vm, ObjFn* func) {
       .ip = func->code.bytes,
       .closure = closure,
       .stack = vm->sp,
-      .try_ctx = NULL};
+      .try_ctx = new_tryctx()};
   push_frame(vm, frame);
   push_stack(vm, OBJ_VAL(closure));
   init_builtins(vm);
@@ -222,7 +214,7 @@ IResult runtime_error(VM* vm, Value err, char* fmt, ...) {
   while (frame_count) {
     fp = &vm->frames[frame_count - 1];
     // check for error handlers
-    if (fp->try_ctx) {
+    if (fp->try_ctx.handler_ip) {
       vm->frame_count = frame_count;
       vm->fp = fp;
       va_start(ap, fmt);
@@ -517,7 +509,7 @@ inline bool call_value(VM* vm, Value val, int argc, bool is_tco) {
             .closure = AS_CLOSURE(val),
             .stack = vm->sp - 1 - argc,
             .ip = fn->code.bytes,
-            .try_ctx = NULL};
+            .try_ctx = new_tryctx()};
         return push_frame(vm, frame);
       } else {
         // close all upvalues currently still unclosed
@@ -881,14 +873,12 @@ IResult run(VM* vm) {
         vm->fp->ip -= offset;
         continue;
       }
-      case $PUSH_TRY: {
-        if (!push_try(vm, READ_SHORT(vm))) {
-          return RESULT_RUNTIME_ERROR;
-        }
+      case $SET_TRY: {
+        set_try(vm, READ_SHORT(vm));
         break;
       }
-      case $POP_TRY: {
-        pop_try(vm);
+      case $TEAR_TRY: {
+        tear_try(vm);
         break;
       }
       case $THROW: {

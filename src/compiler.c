@@ -566,24 +566,31 @@ void c_for_stmt(Compiler* compiler, AstNode* node) {
   /*
    * for let elem in iterable {}
    * |
+   * `
    * {
+        let e_ = None;
         let is_error = false;
-        let itr = core::iter(iterable);
-        while (true) {
-            let i = try core::next(itr) else is_error = true ;
+        let itr = core::iter(obj);
+        while true { -> loop {
+            let i = try core::next(itr) ? e_ else is_error = true;
             if is_error {
-                break;
+               if e_ == "StopIteration" {
+                   break;
+               } else {
+                   throw e_;
+               }
             }
-            ## rest of code...
+            ## rest of code here...
         }
-      }
+    }
    */
 #define BUFF_SIZE 0xf
-  char is_err[BUFF_SIZE], itr[BUFF_SIZE];
+  char is_err[BUFF_SIZE], itr[BUFF_SIZE], err[BUFF_SIZE];
   int is_err_len =
       snprintf(is_err, BUFF_SIZE, "$is_err_%d", get_free_var(compiler));
   int itr_len =
       snprintf(itr, BUFF_SIZE, "$iter_%d", get_free_var(compiler));
+  int err_len = snprintf(err, BUFF_SIZE, "$err_%d", get_free_var(compiler));
 #undef BUFF_SIZE
 
   ForStmtNode* for_node = &node->for_stmt;
@@ -595,15 +602,22 @@ void c_for_stmt(Compiler* compiler, AstNode* node) {
 
   compiler->scope++;
   BlockStmtNode* block = &desugar->block_stmt;
-  // 1 let is_error = false;
+  // 1. let e_ = None;
   BinaryNode* stmt = &((AstNode*)block->stmts.items[0])->binary;
-  stmt->l_node->var.name = is_err;
-  stmt->l_node->var.len = is_err_len;
+  stmt->l_node->var.name = err;
+  stmt->l_node->var.len = err_len;
   stmt->l_node->var.line = line;
   AstNode* err_var = stmt->l_node;
 
-  // 2 let itr = core::iter(iterable);
+  // 2. let is_error = false;
   stmt = &((AstNode*)block->stmts.items[1])->binary;
+  stmt->l_node->var.name = is_err;
+  stmt->l_node->var.len = is_err_len;
+  stmt->l_node->var.line = line;
+  AstNode* is_err_var = stmt->l_node;
+
+  // 2 let itr = core::iter(iterable);
+  stmt = &((AstNode*)block->stmts.items[2])->binary;
   stmt->r_node->call.args[0] = for_node->iterable;
   stmt->l_node->var.name = itr;
   stmt->l_node->var.len = itr_len;
@@ -611,19 +625,30 @@ void c_for_stmt(Compiler* compiler, AstNode* node) {
   AstNode* itr_var = stmt->l_node;
 
   // 3
-  WhileStmtNode* wh = &((AstNode*)block->stmts.items[2])->while_stmt;
+  WhileStmtNode* wh = &((AstNode*)block->stmts.items[3])->while_stmt;
   wh->type = AST_LOOP;
-  // let i = try core::next(itr) else is_error = true ;
+  // let i = try core::next(itr) ? e_ else is_error = true;
   stmt = &((AstNode*)(wh->block->block_stmt.stmts.items[0]))->binary;
   stmt->l_node->var = for_node->elem->var;
   stmt->r_node->try_h.try_expr->call.args[0] = itr_var;
-  stmt->r_node->try_h.else_expr->binary.l_node = err_var;
+  stmt->r_node->try_h.try_var = err_var;
+  stmt->r_node->try_h.else_expr->binary.l_node = is_err_var;
 
   // if is_error {
   IfElseStmtNode* if_stmt =
       &((AstNode*)(wh->block->block_stmt.stmts.items[1]))->ife_stmt;
-  if_stmt->condition = err_var;
+  if_stmt->condition = is_err_var;
   if_stmt->line = line;
+  // inner if
+  if_stmt =
+      &((AstNode*)(if_stmt->if_block->block_stmt.stmts.items[0]))->ife_stmt;
+  // if e_ == "StopIteration" {
+  if_stmt->condition->binary.l_node = err_var;
+  // else { throw e_; }
+  ExprStmtNode* throw =
+      &((AstNode*)(if_stmt->else_block->block_stmt.stmts.items[0]))
+           ->expr_stmt;
+  throw->expr = err_var;
 
   // save the rest of the block...
   Vec* to = &wh->block->block_stmt.stmts;
@@ -704,10 +729,10 @@ void c_try(Compiler* compiler, AstNode* node) {
   TryNode* try_node = CAST(TryNode*, node);
   // push try handler (we're using emit_jump since it allows creation of a byte-code
   // and slot reservation for its 2-byte operand)
-  int try_slot = emit_jump(compiler, $PUSH_TRY, try_node->line);
+  int try_slot = emit_jump(compiler, $SET_TRY, try_node->line);
   c_(compiler, try_node->try_expr);
   // pop try handler if operation never erred
-  emit_byte(compiler, $POP_TRY, last_line(compiler));
+  emit_byte(compiler, $TEAR_TRY, last_line(compiler));
   // skip handler-expr if operation never erred
   int else_end = emit_jump(compiler, $JMP, last_line(compiler));
   patch_jump(compiler, try_slot);

@@ -909,14 +909,20 @@ static AstNode* parse_for_stmt(Parser* parser) {
 
   char* template =
       "{\n"
-      "        let is_error = false;\n"
-      "        let itr = core::iter(obj);\n"
-      "        while true {\n"
-      "            let i = try core::next(itr) else is_error = true;\n"
-      "            if is_error {\n"
-      "                break;\n"
-      "            }\n"
-      "        }\n"
+      "  let e_ = None;\n"
+      "  let is_error = false;\n"
+      "  let itr = core::iter(obj);\n"
+      "  while true {\n"
+      "      let i = try core::next(itr) ? e_ else is_error = true;\n"
+      "      if is_error {\n"
+      "         if e_ == \"StopIteration\" {\n"
+      "             break;\n"
+      "         } else {\n"
+      "             throw e_;\n"
+      "         }\n"
+      "      }\n"
+      "      ## rest of code here...\n"
+      "  }\n"
       "}";
   Parser prs = new_parser(template, "");
   prs.lexer.line = line;

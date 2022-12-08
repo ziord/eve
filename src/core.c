@@ -375,7 +375,8 @@ Value fn_import(VM* vm, int argc, const Value* args) {
         CallFrame frame = {
             .closure = closure,
             .stack = vm->sp - 1 - argc,
-            .ip = func->code.bytes};
+            .ip = func->code.bytes,
+            .try_ctx = {.handler_ip = NULL, .sp = NULL}};
         vm_push_frame(vm, frame);
         vm->is_compiling = false;
         return module;
@@ -415,7 +416,8 @@ Value fn_import(VM* vm, int argc, const Value* args) {
       CallFrame frame = {
           .closure = closure,
           .stack = vm->sp - 1 - argc,
-          .ip = func->code.bytes};
+          .ip = func->code.bytes,
+          .try_ctx = {.sp = NULL, .handler_ip = NULL}};
       vm_push_frame(vm, frame);
 #ifdef EVE_OPTIMIZE_IMPORTS
       if (filename) {

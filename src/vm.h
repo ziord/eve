@@ -12,7 +12,6 @@
 #endif
 
 #define CALL_FRAME_MAX (0x50)
-#define TRY_FRAME_MAX (UINT16_MAX)
 #define STACK_MAX ((CALL_FRAME_MAX) * (CONST_MAX + 1))
 
 typedef enum {
@@ -27,8 +26,8 @@ typedef struct {
 } TryCtx;
 
 typedef struct {
+  TryCtx try_ctx;
   byte_t* ip;
-  TryCtx* try_ctx;
   ObjClosure* closure;
   Value* stack;
 } CallFrame;
@@ -37,13 +36,11 @@ typedef struct VM {
   bool is_compiling;
   bool has_error;
   int frame_count;
-  int try_count;
   ObjHashMap strings;
   ObjHashMap modules;
   GC gc;
   Value stack[STACK_MAX];
   CallFrame frames[CALL_FRAME_MAX];
-  TryCtx try_ctxs[TRY_FRAME_MAX];
   CallFrame* fp;
   Value* sp;
   ObjUpvalue* upvalues;

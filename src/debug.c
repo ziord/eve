@@ -120,8 +120,8 @@ int dis_instruction(Code* code, int index) {
       return plain_instruction("$SUBSCRIPT", index);
     case $SET_SUBSCRIPT:
       return plain_instruction("$SET_SUBSCRIPT", index);
-    case $POP_TRY:
-      return plain_instruction("$POP_TRY", index);
+    case $TEAR_TRY:
+      return plain_instruction("$TEAR_TRY", index);
     case $THROW:
       return plain_instruction("$THROW", index);
     case $ASSERT:
@@ -134,8 +134,8 @@ int dis_instruction(Code* code, int index) {
       return jump_instruction("$JMP_FALSE_OR_POP", code, index, 1);
     case $LOOP:
       return jump_instruction("$LOOP", code, index, -1);
-    case $PUSH_TRY:
-      return jump_instruction("$PUSH_TRY", code, index, 1);
+    case $SET_TRY:
+      return jump_instruction("$SET_TRY", code, index, 1);
     case $BUILD_LIST:
       return byte_instruction("$BUILD_LIST", code, index);
     case $BUILD_MAP:

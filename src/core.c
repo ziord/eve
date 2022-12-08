@@ -44,6 +44,8 @@ Value fn_next(VM* vm, int argc, const Value* args);
 
 /*** string ***/
 Value fn_str_len(VM* vm, int argc, const Value* args);
+Value get_str_iterator_instance(VM* vm, Value str_val);
+Value get_str_iterator_instance_next(VM* vm, Value si_instance);
 Value fn_str_to_string(VM* vm, int argc, const Value* args);
 Value fn_str_append(VM* vm, int argc, const Value* args);
 Value fn_str_upper(VM* vm, int argc, const Value* args);
@@ -254,14 +256,22 @@ void init_builtins(VM* vm) {
     hashmap_put(&vm->builtins->fields, vm, modname_val, OBJ_VAL(module));
   }
   // setup builtin structs
-  //. list_iterator todo: move this into an internals struct in the vm
+  //. list_iterator
   Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
-  Value list = create_string(vm, &vm->strings, "$_list", 6, false);
-  Value name = create_string(vm, &vm->strings, "list_iterator", 13, false);
-  ObjStruct* list_iterator = create_struct(vm, AS_STRING(name));
+  Value obj = create_string(vm, &vm->strings, "$_obj", 5, false);
+  Value li_name =
+      create_string(vm, &vm->strings, "list_iterator", 13, false);
+  ObjStruct* list_iterator = create_struct(vm, AS_STRING(li_name));
   hashmap_put(&list_iterator->fields, vm, curr, NOTHING_VAL);
-  hashmap_put(&list_iterator->fields, vm, list, NOTHING_VAL);
-  hashmap_put(&vm->builtins->fields, vm, name, OBJ_VAL(list_iterator));
+  hashmap_put(&list_iterator->fields, vm, obj, NOTHING_VAL);
+  hashmap_put(&vm->builtins->fields, vm, li_name, OBJ_VAL(list_iterator));
+  //. string_iterator
+  Value si_name =
+      create_string(vm, &vm->strings, "string_iterator", 15, false);
+  ObjStruct* string_iterator = create_struct(vm, AS_STRING(si_name));
+  hashmap_put(&string_iterator->fields, vm, curr, NOTHING_VAL);
+  hashmap_put(&string_iterator->fields, vm, obj, NOTHING_VAL);
+  hashmap_put(&vm->builtins->fields, vm, si_name, OBJ_VAL(string_iterator));
 }
 
 void init_module(VM* vm, ObjStruct* module) {
@@ -477,8 +487,10 @@ Value fn_iter(VM* vm, int argc, const Value* args) {
   Value iterable = *args;
   if (IS_LIST(iterable)) {
     // get list iterable
-    Value li_instance = get_list_iterator_instance(vm, iterable);
-    return li_instance;
+    return get_list_iterator_instance(vm, iterable);
+  } else if (IS_STRING(iterable)) {
+    // get string iterable
+    return get_str_iterator_instance(vm, iterable);
   } else if (IS_HMAP(iterable)) {
     ObjHashMap* map = AS_HMAP(iterable);
     ObjList* list = create_list(vm, map->length);
@@ -527,6 +539,13 @@ Value fn_next(VM* vm, int argc, const Value* args) {
         return get_list_iterator_instance_next(vm, iterator);
       }
     }
+    name = create_string(vm, &vm->strings, "string_iterator", 15, false);
+    if (instance->strukt->name == AS_STRING(name)) {
+      Value strukt = hashmap_get(&vm->builtins->fields, name);
+      if (AS_STRUCT(strukt) == instance->strukt) {
+        return get_str_iterator_instance_next(vm, iterator);
+      }
+    }
     Value str = create_string(vm, &vm->strings, "next", 4, false);
     Value next = hashmap_get(&instance->fields, str);
     if (IS_CLOSURE(next) || IS_CFUNC(next)) {
@@ -561,6 +580,58 @@ Value fn_next(VM* vm, int argc, const Value* args) {
 /***********************
 *  > core > string
 ***********************/
+Value get_str_iterator_instance(VM* vm, Value str_val) {
+  // core::iter("str") -> string_iterator instance
+  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  vm_push_stack(vm, curr);
+  Value str = create_string(vm, &vm->strings, "$_obj", 5, false);
+  vm_push_stack(vm, str);
+  Value name =
+      create_string(vm, &vm->strings, "string_iterator", 15, false);
+  vm_push_stack(vm, name);
+  ObjStruct* string_iterator =
+      AS_STRUCT(hashmap_get(&vm->builtins->fields, name));
+  ObjInstance* iterator_inst = create_instance(vm, string_iterator);
+  vm_push_stack(vm, OBJ_VAL(iterator_inst));
+  hashmap_put(&iterator_inst->fields, vm, curr, NONE_VAL);
+  hashmap_put(&iterator_inst->fields, vm, str, str_val);
+  vm->sp -= 4;
+  return OBJ_VAL(iterator_inst);
+}
+
+Value get_str_iterator_instance_next(VM* vm, Value si_instance) {
+  ObjInstance* instance = AS_INSTANCE(si_instance);
+  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  Value str = create_string(vm, &vm->strings, "$_obj", 5, false);
+  Value str_val = hashmap_get(&instance->fields, str);
+  Value curr_idx = hashmap_get(&instance->fields, curr);
+  if (str_val == NOTHING_VAL || curr_idx == NOTHING_VAL) {
+    runtime_error(
+        vm,
+        NOTHING_VAL,
+        "Could not obtain string_iterator internal field");
+    return NOTHING_VAL;
+  }
+  int index;
+  ObjString* str_obj = AS_STRING(str_val);
+  if (curr_idx == NONE_VAL) {
+    index = 0;
+  } else {
+    index = AS_NUMBER(curr_idx) + 1;
+  }
+  if (index >= str_obj->length) {
+    runtime_error(vm, NOTHING_VAL, "StopIteration");
+    return NOTHING_VAL;
+  } else {
+    Value elem =
+        create_string(vm, &vm->strings, str_obj->str + index, 1, false);
+    vm_push_stack(vm, elem);
+    hashmap_put(&instance->fields, vm, curr, NUMBER_VAL(index));
+    vm_pop_stack(vm);
+    return elem;
+  }
+}
+
 Value fn_str_len(VM* vm, int argc, const Value* args) {
   ASSERT_TYPE(
       vm,
@@ -579,7 +650,7 @@ Value get_list_iterator_instance(VM* vm, Value list_val) {
   // core::iter([]) -> list_iterator instance
   Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
   vm_push_stack(vm, curr);
-  Value list = create_string(vm, &vm->strings, "$_list", 6, false);
+  Value list = create_string(vm, &vm->strings, "$_obj", 5, false);
   vm_push_stack(vm, list);
   Value name = create_string(vm, &vm->strings, "list_iterator", 13, false);
   vm_push_stack(vm, name);
@@ -596,7 +667,7 @@ Value get_list_iterator_instance(VM* vm, Value list_val) {
 Value get_list_iterator_instance_next(VM* vm, Value li_instance) {
   ObjInstance* instance = AS_INSTANCE(li_instance);
   Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
-  Value list = create_string(vm, &vm->strings, "$_list", 6, false);
+  Value list = create_string(vm, &vm->strings, "$_obj", 5, false);
   Value list_val = hashmap_get(&instance->fields, list);
   Value curr_idx = hashmap_get(&instance->fields, curr);
   if (list_val == NOTHING_VAL || curr_idx == NOTHING_VAL) {

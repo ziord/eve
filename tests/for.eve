@@ -39,3 +39,27 @@ for let k in dict {
     assert dict[k];  ## todo: test dict[k] is in vals
 }
 
+let name = "this is a very long stuffy";
+let k = #{"a": name};
+for let c in k["a"] {
+    assert c;
+}
+
+let s_count = 0;
+let i_count = 0;
+let ws_count = 0;
+for let ch in name {
+    core::print(ch, ">> ");
+    if ch == "s" {
+        s_count += 1;
+    } else if ch == "i" {
+        i_count += 1;
+    } else if ch == " " {
+        ws_count += 1;
+    }
+}
+assert s_count == 3;
+assert i_count == 2;
+assert ws_count == 5;
+show "";
+

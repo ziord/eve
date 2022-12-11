@@ -320,6 +320,7 @@ Value create_string(
     string = CREATE_OBJ(vm, ObjString, OBJ_STR, sizeof(ObjString));
     val = OBJ_VAL(string);
     vm_push_stack(vm, val);  // gc reasons
+    string->str = str;  // gc reasons
     string->hash = hash;
     if (!is_alloc) {
       string->str = ALLOC(vm, char, len + 1);

@@ -915,7 +915,7 @@ static AstNode* parse_for_stmt(Parser* parser) {
       "  while true {\n"
       "      let i = try core::next(itr) ? e_ else is_error = true;\n"
       "      if is_error {\n"
-      "         if e_ == \"StopIteration\" {\n"
+      "         if e_ == core::StopIteration {\n"
       "             break;\n"
       "         } else {\n"
       "             throw e_;\n"

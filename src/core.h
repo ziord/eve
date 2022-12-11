@@ -3,7 +3,7 @@
 
 #include "value.h"
 
-void init_builtins(VM* vm);
-void init_module(VM* vm, ObjStruct* module);
+void init_builtins(VM* vm, ObjStruct* current_mod);
+void inject_builtins(VM* vm, ObjStruct* module);
 
 #endif  //EVE_CORE_H

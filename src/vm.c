@@ -142,6 +142,10 @@ bool vm_push_frame(VM* vm, CallFrame frame) {
   return push_frame(vm, frame);
 }
 
+CallFrame vm_pop_frame(VM* vm) {
+  return pop_frame(vm);
+}
+
 inline static void print_stack(VM* vm) {
   printf("\t\t\t\t");
   for (Value* sp = vm->stack; sp < vm->sp; sp++) {
@@ -200,9 +204,13 @@ void boot_vm(VM* vm, ObjFn* func) {
       .try_ctx = new_tryctx()};
   push_frame(vm, frame);
   push_stack(vm, OBJ_VAL(closure));
-  init_builtins(vm);
-  init_module(vm, closure->func->module);
+  init_builtins(vm, closure->func->module);
   vm->is_compiling = false;
+  if (vm->has_error) {
+    free_vm(vm);
+    fprintf(stderr, "vm boot failed.\n");
+    exit(EXIT_FAILURE);
+  }
 }
 
 IResult runtime_error(VM* vm, Value err, char* fmt, ...) {

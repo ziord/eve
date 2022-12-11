@@ -53,6 +53,7 @@ typedef struct VM {
 Value vm_pop_stack(VM* vm);
 void vm_push_stack(VM* vm, Value val);
 bool vm_push_frame(VM* vm, CallFrame frame);
+CallFrame vm_pop_frame(VM* vm);
 bool vm_call_value(VM* vm, Value val, int argc);
 VM new_vm();
 void free_vm(VM* vm);

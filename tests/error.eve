@@ -1,0 +1,3 @@
+assert core::StopIteration;
+assert core::Error::new("oops").message == "oops";
+assert (try fn(){throw core::StopIteration;}()) == core::StopIteration;

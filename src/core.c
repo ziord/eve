@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "compiler.h"
+#include "inc.h"
 #include "parser.h"
 #include "serde.h"
 #include "vm.h"
@@ -222,7 +223,57 @@ void add_cfn(VM* vm, ObjStruct* module, char* name, int arity, CFn func) {
   vm_pop_stack(vm);
 }
 
-void init_builtins(VM* vm) {
+Value compile_module(
+    VM* vm,
+    char* src,
+    char* mod_name,
+    bool store_builtins) {
+  Value module = NOTHING_VAL;
+  // parse the module
+  Parser parser = new_parser(src, mod_name);
+  AstNode* root = parse(&parser);
+  if (parser.errors) {
+    free_parser(&parser);
+    vm->has_error = true;
+  } else {
+    // compile the module if parsing was successful
+    Compiler compiler;
+    ObjFn* func = create_function(vm);
+    new_compiler(&compiler, root, func, vm, mod_name);
+    compile(&compiler);
+    free_parser(&parser);
+    if (!compiler.errors) {
+      module = OBJ_VAL(func->module);
+      ObjClosure* closure = create_closure(vm, func);
+      if (store_builtins) {
+        inject_builtins(vm, func->module);
+        // cache the module
+        hashmap_put(&vm->modules, vm, OBJ_VAL(func->module->name), module);
+      }
+      // save the current frame
+      CallFrame curr_frame = vm_pop_frame(vm);
+      vm_push_stack(vm, OBJ_VAL(closure));
+      CallFrame frame = {
+          .closure = closure,
+          .stack = vm->sp - 1,
+          .ip = func->code.bytes,
+          .try_ctx = {.sp = NULL, .handler_ip = NULL}};
+      // push a new frame to execute the module
+      vm_push_frame(vm, frame);
+      IResult res = run(vm);
+      // remove the newly executed frame from the stack
+      vm_pop_stack(vm);
+      // restore the current frame
+      vm_push_frame(vm, curr_frame);
+      if (res != RESULT_SUCCESS) {
+        return NOTHING_VAL;
+      }
+    }
+  }
+  return module;
+}
+
+void init_builtins(VM* vm, ObjStruct* current_mod) {
   // setup core module and its members
   ObjString* core = AS_STRING(create_string(
       vm,
@@ -231,6 +282,7 @@ void init_builtins(VM* vm) {
       mod_data[0].name_len,
       false));
   vm->builtins = create_module(vm, core);
+  inject_builtins(vm, current_mod);
   hashmap_init(&vm->builtins->fields);
   for (int i = 0; i < mod_data[0].field_len; i++) {
     struct FnData data = mod_data[0].data[i];
@@ -272,9 +324,15 @@ void init_builtins(VM* vm) {
   hashmap_put(&string_iterator->fields, vm, curr, NOTHING_VAL);
   hashmap_put(&string_iterator->fields, vm, obj, NOTHING_VAL);
   hashmap_put(&vm->builtins->fields, vm, si_name, OBJ_VAL(string_iterator));
+  // setup other builtins members
+  Value module = compile_module(vm, BUILTINS_SRC_INC, "core", false);
+  if (module != NOTHING_VAL) {
+    ObjStruct* mod = AS_STRUCT(module);
+    hashmap_copy(vm, &vm->builtins->fields, &mod->fields);
+  }
 }
 
-void init_module(VM* vm, ObjStruct* module) {
+void inject_builtins(VM* vm, ObjStruct* module) {
   vm_push_stack(vm, OBJ_VAL(module));
   // store builtins into module's globals as "core"
   hashmap_put(
@@ -377,7 +435,7 @@ Value fn_import(VM* vm, int argc, const Value* args) {
       free_serde(&serde);
       if (func) {
         ObjClosure* closure = create_closure(vm, func);
-        init_module(vm, func->module);
+        inject_builtins(vm, func->module);
         module = OBJ_VAL(func->module);
         // cache the module
         hashmap_put(&vm->modules, vm, value, module);
@@ -418,7 +476,7 @@ Value fn_import(VM* vm, int argc, const Value* args) {
     cleanup_parser(&parser, src);
     if (!compiler.errors) {
       // initialize the module
-      init_module(vm, func->module);
+      inject_builtins(vm, func->module);
       module = OBJ_VAL(func->module);
       // cache the module
       hashmap_put(&vm->modules, vm, value, module);
@@ -600,6 +658,12 @@ Value get_str_iterator_instance(VM* vm, Value str_val) {
 }
 
 Value get_str_iterator_instance_next(VM* vm, Value si_instance) {
+  // this function like get_list_iterator_next() makes a number of
+  // assumptions: we do not push any created value on the stack to appease
+  // the GC because the values being created are strings, and the create
+  // operations are simply cache-fetches since the strings would already
+  // have been created during init_builtins() setup, when booting the VM
+  // (remember - all strings are interned in eve.)
   ObjInstance* instance = AS_INSTANCE(si_instance);
   Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
   Value str = create_string(vm, &vm->strings, "$_obj", 5, false);
@@ -620,7 +684,9 @@ Value get_str_iterator_instance_next(VM* vm, Value si_instance) {
     index = AS_NUMBER(curr_idx) + 1;
   }
   if (index >= str_obj->length) {
-    runtime_error(vm, NOTHING_VAL, "StopIteration");
+    Value err = create_string(vm, &vm->strings, "StopIteration", 13, false);
+    Value itr_err = hashmap_get(&vm->builtins->fields, err);
+    runtime_error(vm, itr_err, "StopIteration");
     return NOTHING_VAL;
   } else {
     Value elem =
@@ -685,7 +751,9 @@ Value get_list_iterator_instance_next(VM* vm, Value li_instance) {
     index = AS_NUMBER(curr_idx) + 1;
   }
   if (index >= list_obj->elems.length) {
-    runtime_error(vm, NOTHING_VAL, "StopIteration");
+    Value err = create_string(vm, &vm->strings, "StopIteration", 13, false);
+    Value itr_err = hashmap_get(&vm->builtins->fields, err);
+    runtime_error(vm, itr_err, "StopIteration");
     return NOTHING_VAL;
   } else {
     Value elem = list_obj->elems.buffer[index];

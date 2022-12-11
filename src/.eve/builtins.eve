@@ -1,0 +1,8 @@
+struct Error {
+    @compose message;
+    @declare new => fn (msg) {
+        return Error {message = msg};
+    };
+}
+
+struct StopIteration {}

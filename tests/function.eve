@@ -124,3 +124,16 @@ fn should_be_5() {
 }
 
 assert should_be_5() == 5;
+
+let add = fn(a, b) -> try a + b;
+assert add(5, 6) == 11;
+
+let diff = fn(a, b) -> a - b;
+assert diff(5, 6) == -1;
+
+let many = fn() {
+    let x = 10;
+    return fn() -> x * 3;
+};
+
+assert many()() == 30;

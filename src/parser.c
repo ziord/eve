@@ -1077,6 +1077,31 @@ static AstNode* parse_func_decl(Parser* parser, bool is_lambda) {
   }
   consume(parser, TK_RBRACK);
   // body
+  if (is_lambda) {
+    // fn(...) -> expr;
+    if (is_tty(parser, TK_MINUS)
+        && is_current_symbol(&parser->lexer, '>')) {
+      advance(parser);  // skip -
+      advance(parser);  // skip >
+      int line = parser->current_tk.line;
+      AstNode* expr = parse_expr(parser);
+      AstNode* body = new_node(parser);
+      body->block_stmt = (BlockStmtNode) {
+          .type = AST_BLOCK_STMT,
+          .line = line,
+      };
+      vec_init(&body->block_stmt.stmts);
+      AstNode* ret = new_node(parser);
+      ret->expr_stmt = (ExprStmtNode) {
+          .type = AST_RETURN_STMT,
+          .line = line,
+          .expr = expr};
+      vec_push(&body->block_stmt.stmts, ret);
+      node->func.body = body;
+      parser->func--;
+      return node;
+    }
+  }
   node->func.body = parse_block_stmt(parser);
   AstNode* ret_node = set_return(parser, &node->func.body->block_stmt);
   can_tco(&node->func, ret_node);

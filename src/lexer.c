@@ -254,19 +254,8 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
       return expect(lexer, "reak", 1, 4, TK_BREAK);
     case 'c':
       return expect(lexer, "ontinue", 1, 7, TK_CONTINUE);
-    case 't':
-      switch (*(lexer->start + 1)) {
-        case 'h':
-          return expect(lexer, "row", 2, 3, TK_THROW);
-        case 'r':
-          switch (*(lexer->start + 2)) {
-            case 'y':
-              return expect(lexer, "", 3, 0, TK_TRY);
-            case 'u':
-              return expect(lexer, "e", 3, 1, TK_TRUE);
-          }
-      }
-      break;
+    case 'e':
+      return expect(lexer, "lse", 1, 3, TK_ELSE);
     case 'f':
       switch (*(lexer->start + 1)) {
         case 'n':
@@ -277,8 +266,19 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
           return expect(lexer, "r", 2, 1, TK_FOR);
       }
       break;
+    case 'i':
+      switch (*(lexer->start + 1)) {
+        case 'n':
+          return expect(lexer, "n", 1, 1, TK_IN);
+        case 'f':
+          return expect(lexer, "f", 1, 1, TK_IF);
+      }
+    case 'l':
+      return expect(lexer, "et", 1, 2, TK_LET);
     case 'N':
       return expect(lexer, "one", 1, 3, TK_NONE);
+    case 'r':
+      return expect(lexer, "eturn", 1, 5, TK_RETURN);
     case 's':
       switch (*(lexer->start + 1)) {
         case 'h':
@@ -287,21 +287,21 @@ TokenTy keyword_type(Lexer* lexer, char ch) {
           return expect(lexer, "ruct", 2, 4, TK_STRUCT);
       }
       break;
+    case 't':
+      switch (*(lexer->start + 1)) {
+        case 'h':
+          return expect(lexer, "row", 2, 3, TK_THROW);
+        case 'r':
+          switch (*(lexer->start + 2)) {
+            case 'u':
+              return expect(lexer, "e", 3, 1, TK_TRUE);
+            case 'y':
+              return expect(lexer, "", 3, 0, TK_TRY);
+          }
+      }
+      break;
     case 'w':
       return expect(lexer, "hile", 1, 4, TK_WHILE);
-    case 'r':
-      return expect(lexer, "eturn", 1, 5, TK_RETURN);
-    case 'i':
-      switch (*(lexer->start + 1)) {
-        case 'n':
-          return expect(lexer, "n", 1, 1, TK_IN);
-        case 'f':
-          return expect(lexer, "f", 1, 1, TK_IF);
-      }
-    case 'e':
-      return expect(lexer, "lse", 1, 3, TK_ELSE);
-    case 'l':
-      return expect(lexer, "et", 1, 2, TK_LET);
     default:
       break;
   }

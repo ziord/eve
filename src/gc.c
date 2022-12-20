@@ -150,6 +150,8 @@ void mark_roots(VM* vm) {
   }
   // mark modules roots
   mark_hashmap(vm, &vm->modules);
+  // mark current module
+  mark_object(vm, &vm->current_module->obj);
   // mark builtins roots
   mark_object(vm, &vm->builtins->obj);
   // mark compiler roots

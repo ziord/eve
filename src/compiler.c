@@ -823,6 +823,8 @@ void c_function(Compiler* compiler, AstNode* node) {
   if (!func_compiler.errors) {
     dis_code(&fn_obj->code, get_func_name(fn_obj));
     printf("\n");
+  } else {
+    compiler->errors += func_compiler.errors;
   }
 #endif
 }

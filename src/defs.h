@@ -7,7 +7,6 @@
 #define CONST_MAX UINT8_MAX
 
 // debug
-#define EVE_DEBUG
 #ifdef EVE_DEBUG
   #define EVE_DEBUG_GC
   #define EVE_DEBUG_EXECUTION

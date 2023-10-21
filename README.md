@@ -4,16 +4,19 @@ eve is a garbage-collected bytecode interpreter. See [tests](https://github.com/
 
 ### Building
 ```
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_STANDARD=11 ..
-cmake --build .
+# debug mode
+make eve-debug
 
-# testing
-eve <filename.eve>
-eve -h # for help
+# release mode
+make eve
+
+# testing the interpreter
+./build/eve <filename.eve>
+./build/eve -h # for help
 ```
 
 ### Testing
+Run test suites:
 `make test`
 
 ### License

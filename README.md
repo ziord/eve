@@ -1,6 +1,6 @@
 ### eve
 
-eve is a garbage-collected bytecode interpreter. See [tests](https://github.com/ziord/eve/tree/master/tests) directory for example programs.
+eve is a garbage-collected bytecode interpreter. See the [tests](https://github.com/ziord/eve/tree/master/tests) directory for example programs.
 
 ### Building
 ```

@@ -195,20 +195,6 @@ ObjString* de_string(EveSerde* serde) {
   return string;
 }
 
-void ser_hashmap(EveSerde* serde, ObjHashMap* hashmap) {
-  /*
-   * .type type
-   */
-  // at compile time, no value is stored in the hashmap,
-  // so just serialise its type
-  ser_obj(serde, (Obj*)hashmap);
-}
-
-Value de_hashmap(EveSerde* serde) {
-  de_obj(serde);
-  return UNUSED(NOTHING_VAL);
-}
-
 void ser_struct(EveSerde* serde, ObjStruct* strukt) {
   /*
    * .type type
@@ -217,7 +203,6 @@ void ser_struct(EveSerde* serde, ObjStruct* strukt) {
    */
   ser_obj(serde, &strukt->obj);
   ser_string(serde, strukt->name);
-  ser_hashmap(serde, &strukt->fields);
 }
 
 Value de_struct(EveSerde* serde, ObjTy ty) {
@@ -229,7 +214,6 @@ Value de_struct(EveSerde* serde, ObjTy ty) {
   ObjString* name = de_string(serde);
   ObjStruct* strukt = create_struct(serde->vm, name);
   strukt->obj.type = ty;
-  de_hashmap(serde);
   return OBJ_VAL(strukt);
 }
 
@@ -301,9 +285,6 @@ void ser_object(EveSerde* serde, Obj* obj) {
     case OBJ_STRUCT:
       ser_struct(serde, (ObjStruct*)obj);
       break;
-    case OBJ_HMAP:
-      ser_hashmap(serde, (ObjHashMap*)obj);
-      break;
     case OBJ_MODULE:
       ser_module(serde, (ObjStruct*)obj);
       break;
@@ -314,6 +295,7 @@ void ser_object(EveSerde* serde, Obj* obj) {
     case OBJ_CLOSURE:
     case OBJ_UPVALUE:
     case OBJ_INSTANCE:
+    case OBJ_HMAP:
     case OBJ_CFN:
       SERDE_ASSERT(serde, false, "Unreachable: object type");
   }
@@ -326,8 +308,6 @@ Value de_object(EveSerde* serde) {
       return OBJ_VAL(de_string(serde));
     case OBJ_STRUCT:
       return de_struct(serde, ty);
-    case OBJ_HMAP:
-      return de_hashmap(serde);
     case OBJ_MODULE:
       return de_module(serde);
     case OBJ_FN:
@@ -337,6 +317,7 @@ Value de_object(EveSerde* serde) {
     case OBJ_UPVALUE:
     case OBJ_INSTANCE:
     case OBJ_CFN:
+    case OBJ_HMAP:
     default:
       SERDE_ASSERT(serde, false, "Unreachable: object type");
   }

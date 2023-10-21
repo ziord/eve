@@ -64,6 +64,15 @@ typedef uint64_t Value;
 #define CREATE_OBJ(vm, obj_struct, obj_ty, size) \
   (obj_struct*)create_object(vm, obj_ty, size)
 
+#define value_equal(a, b) \
+  ((IS_NUMBER((a)) && IS_NUMBER((b))) ? (AS_NUMBER((a)) == AS_NUMBER((b))) \
+                                      : (a) == (b))
+
+#define create_stringv(vm, map, str, len, is_alloc) \
+  OBJ_VAL(create_string(vm, map, str, len, is_alloc))
+
+#define MAP_LOAD_FACTOR (0.75)
+
 typedef struct {
   int length;
   int capacity;
@@ -127,9 +136,20 @@ typedef struct {
   HashEntry* entries;
 } ObjHashMap;
 
+typedef struct MapEntry {
+  ObjString* key;
+  Value value;
+} MapEntry;
+
+typedef struct Map {
+  MapEntry* entries;
+  int capacity;
+  int length;
+} Map;
+
 typedef struct {
   Obj obj;
-  ObjHashMap fields;
+  Map fields;
   ObjString* name;
 } ObjStruct;
 
@@ -169,7 +189,7 @@ typedef struct {
 
 typedef struct {
   Obj obj;
-  ObjHashMap fields;
+  Map fields;
   ObjStruct* strukt;
 } ObjInstance;
 
@@ -194,24 +214,15 @@ int write_value(ValuePool* vp, Value v, VM* vm);
 char* get_value_type(Value val);
 void print_value(Value val);
 void print_object(Value val, Obj* obj);
-bool value_falsy(Value v);
-bool value_equal(Value a, Value b);
+//bool value_falsy(Value v);
+//bool value_equal(Value a, Value b);
 Value object_to_string(VM* vm, Value val);
 Value value_to_string(VM* vm, Value val);
 Obj* create_object(VM* vm, ObjTy ty, size_t size);
 void free_object(VM* vm, Obj* obj);
-Value create_string(
-    VM* vm,
-    ObjHashMap* table,
-    char* str,
-    int len,
-    bool is_alloc);
-ObjString* create_de_string(
-    VM* vm,
-    ObjHashMap* table,
-    char* str,
-    int len,
-    uint32_t hash);
+ObjString* create_string(VM* vm, Map* map, char* str, int len, bool is_alloc);
+ObjString*
+create_de_string(VM* vm, Map* map, char* str, int len, uint32_t hash);
 ObjList* create_list(VM* vm, int len);
 ObjHashMap* create_hashmap(VM* vm);
 ObjFn* create_function(VM* vm);
@@ -225,11 +236,6 @@ char* get_func_name(ObjFn* fn);
 void hashmap_init(ObjHashMap* table);
 bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value);
 Value hashmap_get(ObjHashMap* table, Value key);
-bool hashmap_has_key(ObjHashMap* table, Value key, Value* value);
-bool hashmap_remove(ObjHashMap* table, Value key);
-void hashmap_copy(VM* vm, ObjHashMap* map1, ObjHashMap* map2);
 void hashmap_get_keys(ObjHashMap* table, ObjList* list);
-ObjString*
-hashmap_find_interned(ObjHashMap* table, char* str, int len, uint32_t hash);
 
 #endif  // EVE_VALUE_H

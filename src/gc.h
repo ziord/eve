@@ -4,7 +4,7 @@
 #include "value.h"
 #include "vec.h"
 
-#define GC_HEAP_GROWTH_FACTOR 2
+#define GC_HEAP_GROWTH_FACTOR 1
 
 typedef struct {
   // total bytes allocated

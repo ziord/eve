@@ -4,3 +4,5 @@ build
 .DS_Store
 dump.txt
 tests/out.txt
+cmake-build-debug-event-trace
+cmake-build-debug-event-trace-coverage

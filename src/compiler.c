@@ -60,13 +60,13 @@ void new_compiler(
       .current_loop = {.scope = 0},
       .enclosing = NULL};
   if (module_name) {
-    Value name = create_string(
+    ObjString* name = create_string(
         vm,
         &vm->strings,
         module_name,
         (int)strlen(module_name),
         false);
-    compiler->module = create_module(vm, AS_STRING(name));
+    compiler->module = create_module(vm, name);
     compiler->func->module = compiler->module;
   }
   if (!vm->compiler) {
@@ -92,7 +92,7 @@ inline static int get_free_var(Compiler* compiler) {
 }
 
 static int store_variable(Compiler* compiler, VarNode* var) {
-  Value val = create_string(
+  Value val = create_stringv(
       compiler->vm,
       &compiler->vm->strings,
       var->name,
@@ -245,7 +245,7 @@ void c_num(Compiler* compiler, AstNode* node) {
 
 void c_str(Compiler* compiler, AstNode* node) {
   StringNode* str = CAST(StringNode*, node);
-  Value str_val = create_string(
+  Value str_val = create_stringv(
       compiler->vm,
       &compiler->vm->strings,
       str->start,
@@ -783,12 +783,12 @@ void c_function(Compiler* compiler, AstNode* node) {
     // set as initialized for functions with recursive calls
     if (func->name) {
       init_lvar(compiler, &func->name->var);
-      fn_obj->name = AS_STRING(create_string(
+      fn_obj->name = create_string(
           compiler->vm,
           &compiler->vm->strings,
           func->name->var.name,
           func->name->var.len,
-          false));
+          false);
     }
   }
   Compiler func_compiler;

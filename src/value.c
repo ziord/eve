@@ -1,8 +1,7 @@
 #include "value.h"
 
+#include "map.h"
 #include "vm.h"
-
-#define LOAD_FACTOR (0.75)
 
 void init_value_pool(ValuePool* vp) {
   vp->values = NULL;
@@ -211,21 +210,6 @@ void print_value(Value val) {
   }
 }
 
-bool value_falsy(Value v) {
-  return (
-      IS_NUMBER(v) && !AS_NUMBER(v) || (IS_BOOL(v) && !AS_BOOL(v))
-      || IS_NONE(v) || (IS_LIST(v) && !AS_LIST(v)->elems.length)
-      || (IS_STRING(v) && !AS_STRING(v)->length)
-      || (IS_HMAP(v) && !AS_HMAP(v)->length));
-}
-
-bool value_equal(Value a, Value b) {
-  if (IS_NUMBER(a) && IS_NUMBER(b)) {
-    return AS_NUMBER(a) == AS_NUMBER(b);
-  }
-  return a == b;
-}
-
 Value object_to_string(VM* vm, Value val) {
   switch (AS_OBJ(val)->type) {
     case OBJ_STR:
@@ -233,19 +217,19 @@ Value object_to_string(VM* vm, Value val) {
     case OBJ_LIST: {
       char buff[15];
       int len = snprintf(buff, 15, "@list[%d]", AS_LIST(val)->elems.length);
-      return (create_string(vm, &vm->strings, buff, len, false));
+      return create_stringv(vm, &vm->strings, buff, len, false);
     }
     case OBJ_HMAP: {
       char buff[20];
       int len = snprintf(buff, 20, "@hashmap[%d]", AS_HMAP(val)->length);
-      return (create_string(vm, &vm->strings, buff, len, false));
+      return create_stringv(vm, &vm->strings, buff, len, false);
     }
     case OBJ_CLOSURE: {
       ObjFn* fn = AS_CLOSURE(val)->func;
       int len = 10 + (fn->name ? fn->name->length : 3);
       char buff[len];
       len = snprintf(buff, len, "@fn[%s]", get_func_name(fn));
-      return (create_string(vm, &vm->strings, buff, len, false));
+      return create_stringv(vm, &vm->strings, buff, len, false);
     }
     case OBJ_MODULE:
     case OBJ_STRUCT: {
@@ -257,21 +241,21 @@ Value object_to_string(VM* vm, Value val) {
           len,
           AS_OBJ(val)->type == OBJ_STRUCT ? "@struct[%s]" : "@module[%s]",
           name->str);
-      return (create_string(vm, &vm->strings, buff, len, false));
+      return create_stringv(vm, &vm->strings, buff, len, false);
     }
     case OBJ_INSTANCE: {
       ObjString* name = AS_INSTANCE(val)->strukt->name;
       int len = 12 + name->length;
       char buff[len];
       len = snprintf(buff, len, "@instance[%s]", name->str);
-      return (create_string(vm, &vm->strings, buff, len, false));
+      return create_stringv(vm, &vm->strings, buff, len, false);
     }
     case OBJ_CFN: {
       const char* name = AS_CFUNC(val)->name;
       int len = (int)strlen(name) + 14;
       char buff[len];
       len = snprintf(buff, len, "@builtin_fn[%s]", name);
-      return (create_string(vm, &vm->strings, buff, len, false));
+      return create_stringv(vm, &vm->strings, buff, len, false);
     }
     case OBJ_FN:
     case OBJ_UPVALUE:
@@ -286,24 +270,24 @@ Value value_to_string(VM* vm, Value val) {
   } else if (IS_NUMBER(val)) {
     double value = AS_NUMBER(val);
     if (isnan(value)) {
-      return (create_string(vm, &vm->strings, "nan", 3, false));
+      return create_stringv(vm, &vm->strings, "nan", 3, false);
     } else if (isinf(value)) {
       if (value > 0) {
-        return (create_string(vm, &vm->strings, "inf", 3, false));
+        return create_stringv(vm, &vm->strings, "inf", 3, false);
       } else {
-        return (create_string(vm, &vm->strings, "-inf", 3, false));
+        return create_stringv(vm, &vm->strings, "-inf", 3, false);
       }
     } else {
       char buff[25];
       int len = snprintf(buff, 25, "%.14g", AS_NUMBER(val));
-      return (create_string(vm, &vm->strings, buff, len, false));
+      return create_stringv(vm, &vm->strings, buff, len, false);
     }
   } else if (IS_BOOL(val)) {
     int size;
     char* bol = AS_BOOL(val) ? (size = 4, "true") : (size = 5, "false");
-    return (create_string(vm, &vm->strings, bol, size, false));
+    return create_stringv(vm, &vm->strings, bol, size, false);
   } else if (IS_NONE(val)) {
-    return (create_string(vm, &vm->strings, "None", 4, false));
+    return create_stringv(vm, &vm->strings, "None", 4, false);
   } else {
     UNREACHABLE("primitive value to string");
   }
@@ -331,19 +315,13 @@ Obj* create_object(VM* vm, ObjTy ty, size_t size) {
   return obj;
 }
 
-Value create_string(
-    VM* vm,
-    ObjHashMap* table,
-    char* str,
-    int len,
-    bool is_alloc) {
+ObjString*
+create_string(VM* vm, Map* map, char* str, int len, bool is_alloc) {
   uint32_t hash = hash_string(str, len);
-  ObjString* string = hashmap_find_interned(table, str, len, hash);
-  Value val;
+  ObjString* string = map_find_interned(map, str, len, hash);
   if (!string) {
     string = CREATE_OBJ(vm, ObjString, OBJ_STR, sizeof(ObjString));
-    val = OBJ_VAL(string);
-    vm_push_stack(vm, val);  // gc reasons
+    vm_push_stack(vm, OBJ_VAL(string));  // gc reasons
     string->str = str;  // gc reasons
     string->hash = hash;
     if (!is_alloc) {
@@ -356,38 +334,30 @@ Value create_string(
       // track the already allocated bytes
       vm->gc.bytes_allocated += (len + 1);
     }
-    hashmap_put(table, vm, val, FALSE_VAL);
+    map_put(map, vm, string, FALSE_VAL);
     vm_pop_stack(vm);  // gc reasons
   } else {
-    val = OBJ_VAL(string);
     if (is_alloc) {
       // cleanup, since we already have the
       // allocated string (and it's tracked)
       free(str);
     }
   }
-  return val;
+  return string;
 }
 
-ObjString* create_de_string(
-    VM* vm,
-    ObjHashMap* table,
-    char* str,
-    int len,
-    uint32_t hash) {
-  ObjString* string = hashmap_find_interned(table, str, len, hash);
-  Value val;
+ObjString*
+create_de_string(VM* vm, Map* map, char* str, int len, uint32_t hash) {
+  ObjString* string = map_find_interned(map, str, len, hash);
   if (!string) {
     string = CREATE_OBJ(vm, ObjString, OBJ_STR, sizeof(ObjString));
-    val = OBJ_VAL(string);
     string->hash = hash;
     string->str = str;
     string->length = len;
     // track the already allocated bytes
     vm->gc.bytes_allocated += (len + 1);
-    hashmap_put(table, vm, val, FALSE_VAL);
+    map_put(map, vm, string, FALSE_VAL);
   } else {
-    val = OBJ_VAL(string);
     // cleanup, since we already have the
     // allocated string (and it's tracked)
     free(str);
@@ -448,7 +418,7 @@ ObjUpvalue* create_upvalue(VM* vm, Value* location) {
 ObjStruct* create_struct(VM* vm, ObjString* name) {
   ObjStruct* strukt =
       CREATE_OBJ(vm, ObjStruct, OBJ_STRUCT, sizeof(ObjStruct));
-  hashmap_init(&strukt->fields);
+  map_init(&strukt->fields);
   strukt->name = name;
   return strukt;
 }
@@ -463,7 +433,7 @@ ObjInstance* create_instance(VM* vm, ObjStruct* strukt) {
   ObjInstance* instance =
       CREATE_OBJ(vm, ObjInstance, OBJ_INSTANCE, sizeof(ObjInstance));
   instance->strukt = strukt;
-  hashmap_init(&instance->fields);
+  map_init(&instance->fields);
   return instance;
 }
 
@@ -479,7 +449,7 @@ inline char* get_func_name(ObjFn* fn) {
   return fn->name ? fn->name->str : "<anonymous>";
 }
 
-static uint32_t hash_bits(uint64_t hash) {
+inline static uint32_t hash_bits(uint64_t hash) {
   // from Wren,
   // adapted from http://web.archive.org/web/20071223173210/http://www.concentric.net/~Ttwang/tech/inthash.htm
   hash = ~hash + (hash << 18);
@@ -611,7 +581,7 @@ static void rehash(ObjHashMap* table, VM* vm) {
 }
 
 bool hashmap_put(ObjHashMap* table, VM* vm, Value key, Value value) {
-  if (table->length >= table->capacity * LOAD_FACTOR) {
+  if (table->length >= table->capacity * MAP_LOAD_FACTOR) {
     rehash(table, vm);
   }
   if (insert_entry(table->entries, key, value, table->capacity)) {
@@ -676,34 +646,4 @@ void hashmap_get_keys(ObjHashMap* table, ObjList* list) {
 void hashmap_init(ObjHashMap* table) {
   table->length = table->capacity = 0;
   table->entries = NULL;
-}
-
-ObjString* hashmap_find_interned(
-    ObjHashMap* table,
-    char* str,
-    int len,
-    uint32_t hash) {
-  if (table->capacity == 0)
-    return NULL;
-  uint32_t capacity = table->capacity - 1;
-  uint32_t index = hash & capacity;
-  uint32_t start_index = index;
-  HashEntry* entry;
-  do {
-    entry = &table->entries[index];
-    if (IS_NOTHING(entry->key)) {
-      // NONE value indicates deleted.
-      // We intern strings with FALSE value, i.e. key -> string, value -> False_val
-      if (IS_NONE(entry->value))
-        return NULL;
-    } else if (IS_STRING(entry->key)) {
-      ObjString* string = AS_STRING(entry->key);
-      if (string->length == len && string->hash == hash
-          && memcmp(string->str, str, len) == 0) {
-        return string;
-      }
-    }
-    index = (index + 1) & capacity;
-  } while (start_index != index);
-  return NULL;
 }

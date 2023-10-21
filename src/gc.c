@@ -1,6 +1,7 @@
 #include "gc.h"
 
 #include "compiler.h"
+#include "map.h"
 #include "vm.h"
 
 void mark_value(VM* vm, Value v);
@@ -60,13 +61,13 @@ void free_object(VM* vm, Obj* obj) {
     case OBJ_MODULE:
     case OBJ_STRUCT: {
       ObjStruct* st = (ObjStruct*)obj;
-      FREE_BUFFER(vm, st->fields.entries, HashEntry, st->fields.capacity);
+      FREE_BUFFER(vm, st->fields.entries, MapEntry, st->fields.capacity);
       FREE(vm, obj, ObjStruct);
       break;
     }
     case OBJ_INSTANCE: {
       ObjInstance* ins = (ObjInstance*)obj;
-      FREE_BUFFER(vm, ins->fields.entries, HashEntry, ins->fields.capacity);
+      FREE_BUFFER(vm, ins->fields.entries, MapEntry, ins->fields.capacity);
       FREE(vm, obj, ObjInstance);
       break;
     }
@@ -76,19 +77,19 @@ void free_object(VM* vm, Obj* obj) {
   }
 }
 
-void remove_whites(ObjHashMap* map) {
-  HashEntry* entry;
+void remove_whites(Map* map) {
+  MapEntry* entry;
   // vm->strings is a hashmap of {ObjString*, FALSE_VAL}, basically a set
   for (int i = 0; i < map->capacity; i++) {
     entry = &map->entries[i];
     // all unmarked strings are whites (unreachable), so remove them.
-    if (IS_OBJ(entry->key) && !AS_OBJ(entry->key)->marked) {
+    if (entry->key && !entry->key->obj.marked) {
 #ifdef EVE_DEBUG_GC
-      printf("  [*] removing map weak-ref %p (", AS_OBJ(entry->key));
-      print_value(entry->key);
+      printf("  [*] removing map weak-ref %p (", &(entry->key->obj));
+      printf("%s", entry->key->str);
       printf(")\n");
 #endif
-      hashmap_remove(map, entry->key);
+      map_remove(map, entry->key);
     }
   }
 }
@@ -99,6 +100,17 @@ void mark_hashmap(VM* vm, ObjHashMap* map) {
     entry = &map->entries[i];
     if (!IS_NOTHING(entry->key)) {
       mark_value(vm, entry->key);
+      mark_value(vm, entry->value);
+    }
+  }
+}
+
+void mark_map(VM* vm, Map* map) {
+  MapEntry* entry;
+  for (int i = 0; i < map->capacity; i++) {
+    entry = &map->entries[i];
+    if (entry->key) {
+      mark_object(vm, &entry->key->obj);
       mark_value(vm, entry->value);
     }
   }
@@ -149,7 +161,7 @@ void mark_roots(VM* vm) {
     mark_object(vm, &vm->frames[i].closure->obj);
   }
   // mark modules roots
-  mark_hashmap(vm, &vm->modules);
+  mark_map(vm, &vm->modules);
   // mark current module
   mark_object(vm, &vm->current_module->obj);
   // mark builtins roots
@@ -205,13 +217,13 @@ void blacken_object(VM* vm, Obj* obj) {
     case OBJ_MODULE:
     case OBJ_STRUCT: {
       ObjStruct* strukt = (ObjStruct*)obj;
-      mark_hashmap(vm, &strukt->fields);
+      mark_map(vm, &strukt->fields);
       mark_object(vm, &strukt->name->obj);
       return;
     }
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)obj;
-      mark_hashmap(vm, &instance->fields);
+      mark_map(vm, &instance->fields);
       mark_object(vm, &instance->strukt->obj);
       return;
     }
@@ -273,7 +285,7 @@ void collect(VM* vm) {
   remove_whites(&vm->strings);
   // sweep
   sweep(vm);
-  vm->gc.next_collection = vm->gc.bytes_allocated * GC_HEAP_GROWTH_FACTOR;
+  vm->gc.next_collection = vm->gc.bytes_allocated << GC_HEAP_GROWTH_FACTOR;
 #if defined(EVE_DEBUG_GC)
   size_t size_now = vm->gc.bytes_allocated;
   printf(

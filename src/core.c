@@ -6,6 +6,7 @@
 
 #include "compiler.h"
 #include "inc.h"
+#include "map.h"
 #include "parser.h"
 #include "serde.h"
 #include "vm.h"
@@ -184,12 +185,12 @@ ObjString* resolve_path(VM* vm, ObjString* fname) {
       res = realpath(buff, resolved);
 #endif
       if (res != NULL) {
-        return AS_STRING(create_string(
+        return create_string(
             vm,
             &vm->strings,
             resolved,
             strlen(resolved),
-            false));
+            false);
       }
     }
   } else {
@@ -201,12 +202,7 @@ ObjString* resolve_path(VM* vm, ObjString* fname) {
     res = realpath(fname->str, resolved);
 #endif
     if (res != NULL) {
-      return AS_STRING(create_string(
-          vm,
-          &vm->strings,
-          resolved,
-          strlen(resolved),
-          false));
+      return create_string(vm, &vm->strings, resolved, strlen(resolved), false);
     }
   }
   return NULL;
@@ -216,18 +212,14 @@ void add_cfn(VM* vm, ObjStruct* module, char* name, int arity, CFn func) {
   // adds a CFn object to module
   vm_push_stack(
       vm,
-      create_string(vm, &vm->strings, name, (int)strlen(name), false));
+      create_stringv(vm, &vm->strings, name, (int)strlen(name), false));
   vm_push_stack(vm, OBJ_VAL(create_cfn(vm, func, arity, name)));
-  hashmap_put(&module->fields, vm, *(vm->sp - 2), *(vm->sp - 1));
+  map_put(&module->fields, vm, AS_STRING(*(vm->sp - 2)), *(vm->sp - 1));
   vm_pop_stack(vm);
   vm_pop_stack(vm);
 }
 
-Value compile_module(
-    VM* vm,
-    char* src,
-    char* mod_name,
-    bool store_builtins) {
+Value compile_module(VM* vm, char* src, char* mod_name, bool store_builtins) {
   Value module = NOTHING_VAL;
   // parse the module
   Parser parser = new_parser(src, mod_name);
@@ -248,7 +240,7 @@ Value compile_module(
       if (store_builtins) {
         inject_builtins(vm, func->module);
         // cache the module
-        hashmap_put(&vm->modules, vm, OBJ_VAL(func->module->name), module);
+        map_put(&vm->modules, vm, func->module->name, module);
       }
       // save the current frame
       CallFrame curr_frame = vm_pop_frame(vm);
@@ -275,15 +267,15 @@ Value compile_module(
 
 void init_builtins(VM* vm, ObjStruct* current_mod) {
   // setup core module and its members
-  ObjString* core = AS_STRING(create_string(
+  ObjString* core = create_string(
       vm,
       &vm->strings,
       mod_data[0].module_name,
       mod_data[0].name_len,
-      false));
+      false);
   vm->builtins = create_module(vm, core);
   inject_builtins(vm, current_mod);
-  hashmap_init(&vm->builtins->fields);
+  map_init(&vm->builtins->fields);
   for (int i = 0; i < mod_data[0].field_len; i++) {
     struct FnData data = mod_data[0].data[i];
     add_cfn(vm, vm->builtins, data.name, data.arity, data.func);
@@ -291,55 +283,50 @@ void init_builtins(VM* vm, ObjStruct* current_mod) {
   // setup other modules
   for (int i = 1; i < sizeof(mod_data) / sizeof(struct ModuleData); i++) {
     struct ModuleData m_data = mod_data[i];
-    Value modname_val = create_string(
+    ObjString* modname = create_string(
         vm,
         &vm->strings,
         m_data.module_name,
         m_data.name_len,
         false);
-    ObjString* modname = AS_STRING(modname_val);
     ObjStruct* module = create_module(vm, modname);
-    hashmap_init(&module->fields);
+    map_init(&module->fields);
     for (int j = 0; j < m_data.field_len; j++) {
       struct FnData fn_data = m_data.data[j];
       add_cfn(vm, module, fn_data.name, fn_data.arity, fn_data.func);
     }
     // store the module in the core module
-    hashmap_put(&vm->builtins->fields, vm, modname_val, OBJ_VAL(module));
+    map_put(&vm->builtins->fields, vm, modname, OBJ_VAL(module));
   }
   // setup builtin structs
   //. list_iterator
-  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
-  Value obj = create_string(vm, &vm->strings, "$_obj", 5, false);
-  Value li_name =
+  ObjString* curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  ObjString* obj = create_string(vm, &vm->strings, "$_obj", 5, false);
+  ObjString* li_name =
       create_string(vm, &vm->strings, "list_iterator", 13, false);
-  ObjStruct* list_iterator = create_struct(vm, AS_STRING(li_name));
-  hashmap_put(&list_iterator->fields, vm, curr, NOTHING_VAL);
-  hashmap_put(&list_iterator->fields, vm, obj, NOTHING_VAL);
-  hashmap_put(&vm->builtins->fields, vm, li_name, OBJ_VAL(list_iterator));
+  ObjStruct* list_iterator = create_struct(vm, li_name);
+  map_put(&list_iterator->fields, vm, curr, NOTHING_VAL);
+  map_put(&list_iterator->fields, vm, obj, NOTHING_VAL);
+  map_put(&vm->builtins->fields, vm, li_name, OBJ_VAL(list_iterator));
   //. string_iterator
-  Value si_name =
+  ObjString* si_name =
       create_string(vm, &vm->strings, "string_iterator", 15, false);
-  ObjStruct* string_iterator = create_struct(vm, AS_STRING(si_name));
-  hashmap_put(&string_iterator->fields, vm, curr, NOTHING_VAL);
-  hashmap_put(&string_iterator->fields, vm, obj, NOTHING_VAL);
-  hashmap_put(&vm->builtins->fields, vm, si_name, OBJ_VAL(string_iterator));
+  ObjStruct* string_iterator = create_struct(vm, si_name);
+  map_put(&string_iterator->fields, vm, curr, NOTHING_VAL);
+  map_put(&string_iterator->fields, vm, obj, NOTHING_VAL);
+  map_put(&vm->builtins->fields, vm, si_name, OBJ_VAL(string_iterator));
   // setup other builtins members
   Value module = compile_module(vm, BUILTINS_SRC_INC, "core", false);
   if (module != NOTHING_VAL) {
     ObjStruct* mod = AS_STRUCT(module);
-    hashmap_copy(vm, &vm->builtins->fields, &mod->fields);
+    map_copy(vm, &vm->builtins->fields, &mod->fields);
   }
 }
 
 void inject_builtins(VM* vm, ObjStruct* module) {
   vm_push_stack(vm, OBJ_VAL(module));
   // store builtins into module's globals as "core"
-  hashmap_put(
-      &module->fields,
-      vm,
-      OBJ_VAL(vm->builtins->name),
-      OBJ_VAL(vm->builtins));
+  map_put(&module->fields, vm, vm->builtins->name, OBJ_VAL(vm->builtins));
   vm_pop_stack(vm);
 }
 
@@ -392,7 +379,7 @@ Value fn_import(VM* vm, int argc, const Value* args) {
   vm->is_compiling = true;
   Value module;
   // if the module is already cached, just return it
-  if ((module = hashmap_get(&vm->modules, value)) != NOTHING_VAL) {
+  if ((module = map_get(&vm->modules, AS_STRING(value))) != NOTHING_VAL) {
     return module;
   }
   ObjString* fname = AS_STRING(value);
@@ -438,7 +425,7 @@ Value fn_import(VM* vm, int argc, const Value* args) {
         inject_builtins(vm, func->module);
         module = OBJ_VAL(func->module);
         // cache the module
-        hashmap_put(&vm->modules, vm, value, module);
+        map_put(&vm->modules, vm, fname, module);
         // push a new frame to execute the module
         CallFrame frame = {
             .closure = closure,
@@ -479,7 +466,7 @@ Value fn_import(VM* vm, int argc, const Value* args) {
       inject_builtins(vm, func->module);
       module = OBJ_VAL(func->module);
       // cache the module
-      hashmap_put(&vm->modules, vm, value, module);
+      map_put(&vm->modules, vm, fname, module);
       // push a new frame to execute the module
       CallFrame frame = {
           .closure = closure,
@@ -521,7 +508,7 @@ Value fn_exit(VM* vm, int argc, const Value* args) {
 Value fn_type(VM* vm, int argc, const Value* args) {
   (void)argc;
   char* type = get_value_type(*args);
-  return create_string(vm, &vm->strings, type, (int)strlen(type), false);
+  return create_stringv(vm, &vm->strings, type, (int)strlen(type), false);
 }
 
 Value fn_clock(VM* vm, int argc, const Value* args) {
@@ -536,7 +523,7 @@ Value fn_time(VM* vm, int argc, const Value* args) {
 
 Value fn_offload(VM* vm, int argc, const Value* args) {
   (void)argc, (void)args;
-  hashmap_copy(vm, &vm->current_module->fields, &vm->builtins->fields);
+  map_copy(vm, &vm->current_module->fields, &vm->builtins->fields);
   return NONE_VAL;
 }
 
@@ -558,8 +545,8 @@ Value fn_iter(VM* vm, int argc, const Value* args) {
     vm_pop_stack(vm);
     return li_instance;
   } else if (IS_INSTANCE(iterable)) {
-    Value str = create_string(vm, &vm->strings, "iter", 4, false);
-    Value iter = hashmap_get(&AS_INSTANCE(iterable)->fields, str);
+    ObjString* str = create_string(vm, &vm->strings, "iter", 4, false);
+    Value iter = map_get(&AS_INSTANCE(iterable)->fields, str);
     if (IS_CLOSURE(iter) || IS_CFUNC(iter)) {
       vm_pop_stack(vm);
       vm_call_value(vm, iter, 0);
@@ -589,23 +576,23 @@ Value fn_next(VM* vm, int argc, const Value* args) {
   Value iterator = *args;
   if (IS_INSTANCE(iterator)) {
     ObjInstance* instance = AS_INSTANCE(iterator);
-    Value name =
+    ObjString* name =
         create_string(vm, &vm->strings, "list_iterator", 13, false);
-    if (instance->strukt->name == AS_STRING(name)) {
-      Value strukt = hashmap_get(&vm->builtins->fields, name);
+    if (instance->strukt->name == name) {
+      Value strukt = map_get(&vm->builtins->fields, name);
       if (AS_STRUCT(strukt) == instance->strukt) {
         return get_list_iterator_instance_next(vm, iterator);
       }
     }
     name = create_string(vm, &vm->strings, "string_iterator", 15, false);
-    if (instance->strukt->name == AS_STRING(name)) {
-      Value strukt = hashmap_get(&vm->builtins->fields, name);
+    if (instance->strukt->name == name) {
+      Value strukt = map_get(&vm->builtins->fields, name);
       if (AS_STRUCT(strukt) == instance->strukt) {
         return get_str_iterator_instance_next(vm, iterator);
       }
     }
-    Value str = create_string(vm, &vm->strings, "next", 4, false);
-    Value next = hashmap_get(&instance->fields, str);
+    ObjString* str = create_string(vm, &vm->strings, "next", 4, false);
+    Value next = map_get(&instance->fields, str);
     if (IS_CLOSURE(next) || IS_CFUNC(next)) {
       vm_pop_stack(vm);
       vm_call_value(vm, next, 0);
@@ -640,19 +627,18 @@ Value fn_next(VM* vm, int argc, const Value* args) {
 ***********************/
 Value get_str_iterator_instance(VM* vm, Value str_val) {
   // core::iter("str") -> string_iterator instance
-  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
-  vm_push_stack(vm, curr);
-  Value str = create_string(vm, &vm->strings, "$_obj", 5, false);
-  vm_push_stack(vm, str);
-  Value name =
+  ObjString* curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  vm_push_stack(vm, OBJ_VAL(curr));
+  ObjString* str = create_string(vm, &vm->strings, "$_obj", 5, false);
+  vm_push_stack(vm, OBJ_VAL(str));
+  ObjString* name =
       create_string(vm, &vm->strings, "string_iterator", 15, false);
-  vm_push_stack(vm, name);
-  ObjStruct* string_iterator =
-      AS_STRUCT(hashmap_get(&vm->builtins->fields, name));
+  vm_push_stack(vm, OBJ_VAL(name));
+  ObjStruct* string_iterator = AS_STRUCT(map_get(&vm->builtins->fields, name));
   ObjInstance* iterator_inst = create_instance(vm, string_iterator);
   vm_push_stack(vm, OBJ_VAL(iterator_inst));
-  hashmap_put(&iterator_inst->fields, vm, curr, NONE_VAL);
-  hashmap_put(&iterator_inst->fields, vm, str, str_val);
+  map_put(&iterator_inst->fields, vm, curr, NONE_VAL);
+  map_put(&iterator_inst->fields, vm, str, str_val);
   vm->sp -= 4;
   return OBJ_VAL(iterator_inst);
 }
@@ -665,10 +651,10 @@ Value get_str_iterator_instance_next(VM* vm, Value si_instance) {
   // have been created during init_builtins() setup, when booting the VM
   // (remember - all strings are interned in eve.)
   ObjInstance* instance = AS_INSTANCE(si_instance);
-  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
-  Value str = create_string(vm, &vm->strings, "$_obj", 5, false);
-  Value str_val = hashmap_get(&instance->fields, str);
-  Value curr_idx = hashmap_get(&instance->fields, curr);
+  ObjString* curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  ObjString* str = create_string(vm, &vm->strings, "$_obj", 5, false);
+  Value str_val = map_get(&instance->fields, str);
+  Value curr_idx = map_get(&instance->fields, curr);
   if (str_val == NOTHING_VAL || curr_idx == NOTHING_VAL) {
     runtime_error(
         vm,
@@ -684,15 +670,16 @@ Value get_str_iterator_instance_next(VM* vm, Value si_instance) {
     index = AS_NUMBER(curr_idx) + 1;
   }
   if (index >= str_obj->length) {
-    Value err = create_string(vm, &vm->strings, "StopIteration", 13, false);
-    Value itr_err = hashmap_get(&vm->builtins->fields, err);
+    ObjString* err =
+        create_string(vm, &vm->strings, "StopIteration", 13, false);
+    Value itr_err = map_get(&vm->builtins->fields, err);
     runtime_error(vm, itr_err, "StopIteration");
     return NOTHING_VAL;
   } else {
     Value elem =
-        create_string(vm, &vm->strings, str_obj->str + index, 1, false);
+        create_stringv(vm, &vm->strings, str_obj->str + index, 1, false);
     vm_push_stack(vm, elem);
-    hashmap_put(&instance->fields, vm, curr, NUMBER_VAL(index));
+    map_put(&instance->fields, vm, curr, NUMBER_VAL(index));
     vm_pop_stack(vm);
     return elem;
   }
@@ -714,28 +701,27 @@ Value fn_str_len(VM* vm, int argc, const Value* args) {
 **********************/
 Value get_list_iterator_instance(VM* vm, Value list_val) {
   // core::iter([]) -> list_iterator instance
-  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
-  vm_push_stack(vm, curr);
-  Value list = create_string(vm, &vm->strings, "$_obj", 5, false);
-  vm_push_stack(vm, list);
-  Value name = create_string(vm, &vm->strings, "list_iterator", 13, false);
-  vm_push_stack(vm, name);
-  ObjStruct* list_iterator =
-      AS_STRUCT(hashmap_get(&vm->builtins->fields, name));
+  ObjString* curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  vm_push_stack(vm, OBJ_VAL(curr));
+  ObjString* list = create_string(vm, &vm->strings, "$_obj", 5, false);
+  vm_push_stack(vm, OBJ_VAL(list));
+  ObjString* name = create_string(vm, &vm->strings, "list_iterator", 13, false);
+  vm_push_stack(vm, OBJ_VAL(name));
+  ObjStruct* list_iterator = AS_STRUCT(map_get(&vm->builtins->fields, name));
   ObjInstance* iterator_inst = create_instance(vm, list_iterator);
   vm_push_stack(vm, OBJ_VAL(iterator_inst));
-  hashmap_put(&iterator_inst->fields, vm, curr, NONE_VAL);
-  hashmap_put(&iterator_inst->fields, vm, list, list_val);
+  map_put(&iterator_inst->fields, vm, curr, NONE_VAL);
+  map_put(&iterator_inst->fields, vm, list, list_val);
   vm->sp -= 4;
   return OBJ_VAL(iterator_inst);
 }
 
 Value get_list_iterator_instance_next(VM* vm, Value li_instance) {
   ObjInstance* instance = AS_INSTANCE(li_instance);
-  Value curr = create_string(vm, &vm->strings, "$_curr", 6, false);
-  Value list = create_string(vm, &vm->strings, "$_obj", 5, false);
-  Value list_val = hashmap_get(&instance->fields, list);
-  Value curr_idx = hashmap_get(&instance->fields, curr);
+  ObjString* curr = create_string(vm, &vm->strings, "$_curr", 6, false);
+  ObjString* list = create_string(vm, &vm->strings, "$_obj", 5, false);
+  Value list_val = map_get(&instance->fields, list);
+  Value curr_idx = map_get(&instance->fields, curr);
   if (list_val == NOTHING_VAL || curr_idx == NOTHING_VAL) {
     runtime_error(
         vm,
@@ -751,13 +737,14 @@ Value get_list_iterator_instance_next(VM* vm, Value li_instance) {
     index = AS_NUMBER(curr_idx) + 1;
   }
   if (index >= list_obj->elems.length) {
-    Value err = create_string(vm, &vm->strings, "StopIteration", 13, false);
-    Value itr_err = hashmap_get(&vm->builtins->fields, err);
+    ObjString* err =
+        create_string(vm, &vm->strings, "StopIteration", 13, false);
+    Value itr_err = map_get(&vm->builtins->fields, err);
     runtime_error(vm, itr_err, "StopIteration");
     return NOTHING_VAL;
   } else {
     Value elem = list_obj->elems.buffer[index];
-    hashmap_put(&instance->fields, vm, curr, NUMBER_VAL(index));
+    map_put(&instance->fields, vm, curr, NUMBER_VAL(index));
     return elem;
   }
 }

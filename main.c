@@ -3,11 +3,11 @@
 #include "src/compiler.h"
 #include "src/serde.h"
 #include "src/vm.h"
-#ifdef EVE_DEBUG
-  #include "src/debug.h"
-#endif
+//#ifdef EVE_DEBUG
+#include "src/debug.h"
+//#endif
 
-int execute_eve(char* fp, const char* bin) {
+int execute_eve(char* fp, const char* bin, bool dis) {
   VM vm = new_vm();
   // parse
   char* src = NULL;
@@ -39,6 +39,9 @@ int execute_eve(char* fp, const char* bin) {
     serialize(&serde, bin, func);
     free_serde(&serde);
   }
+  if (dis) {
+    dis_code(&func->code, "<debug>");
+  }
   // run
   boot_vm(&vm, func);
   IResult ret = run(&vm);
@@ -66,7 +69,7 @@ int execute_eco(char* fp) {
 }
 
 int show_options() {
-  printf("Usage: eve [-h | --help] [-v | --version] <input-file>\n");
+  printf("Usage: eve [-h | --help] [-v | --version] -d? <input-file>\n");
   return 0;
 }
 
@@ -84,12 +87,15 @@ int show_version() {
 }
 
 int parse_args(int argc, char* argv[]) {
-  if (argc != 2) {
+  if (argc < 2) {
     return show_options();
   }
   switch (*(argv[1])) {
     case '-': {
-      if (strlen(argv[1]) == 2 && argv[1][1] == 'h'
+      if (strlen(argv[1]) == 2 && argv[1][1] == 'd') {
+        return execute_eve(argv[2], NULL, true);
+      } else if (
+          strlen(argv[1]) == 2 && argv[1][1] == 'h'
           || strncmp(argv[1], "--help", 6) == 0) {
         return show_help();
       } else if (
@@ -102,7 +108,7 @@ int parse_args(int argc, char* argv[]) {
       }
     }
     default:
-      return execute_eve(argv[1], NULL);
+      return execute_eve(argv[1], NULL, false);
   }
 }
 

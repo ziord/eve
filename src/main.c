@@ -1,10 +1,10 @@
 #include <stdio.h>
 
-#include "src/compiler.h"
-#include "src/serde.h"
-#include "src/vm.h"
+#include "compiler.h"
+#include "serde.h"
+#include "vm.h"
 //#ifdef EVE_DEBUG
-#include "src/debug.h"
+#include "debug.h"
 //#endif
 
 int execute_eve(char* fp, const char* bin, bool dis) {
